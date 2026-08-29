@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Genesis2SB3 - Convert Sega Genesis ROMs into Scratch 3.0 projects">
+    <title>Genesis2SB3</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <main class="app">
+
+    <header class="header">
+        <div class="logo">
+            <span class="logo-main">Genesis2SB3</span>
+            <span class="logo-sub">Genesis ROM → Scratch 3.0</span>
+        </div>
+
+        <div class="header-badge">
+            BROWSER COMPILER
+        </div>
+    </header>
+
+    <section class="hero">
+        <h1>Turn Genesis games into Scratch projects.</h1>
+        <p>
+            Load a Sega Genesis ROM, compile it in your browser,
+            and export a Scratch <strong>.sb3</strong> project.
+        </p>
+    </section>
+
+    <section class="panel">
+        <div class="panel-title">
+            <h2>1. Select ROM</h2>
+            <span id="romStatus">No ROM selected</span>
+        </div>
+
+        <label id="dropZone" class="drop-zone" for="romInput">
+            <input
+                type="file"
+                id="romInput"
+                accept=".bin,.gen,.md,.smd"
+                hidden
+            >
+
+            <div class="drop-icon">+</div>
+
+            <div class="drop-title">
+                Drop a Genesis ROM here
+            </div>
+
+            <div class="drop-subtitle">
+                or click to select a file
+            </div>
+
+            <div class="drop-formats">
+                .BIN &nbsp;•&nbsp; .GEN &nbsp;•&nbsp; .MD &nbsp;•&nbsp; .SMD
+            </div>
+        </label>
+
+        <div id="romInfo" class="rom-info hidden">
+            <div class="rom-details">
+                <div id="romName" class="rom-name">
+                    —
+                </div>
+
+                <div id="romSize" class="rom-size">
+                    —
+                </div>
+            </div>
+
+            <button
+                id="removeRom"
+                class="secondary-button"
+                type="button"
+            >
+                Remove
+            </button>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-title">
+            <h2>2. Compiler Options</h2>
+        </div>
+
+        <div class="option-grid">
+
+            <div class="option">
+                <label for="target">
+                    Target
+                </label>
+
+                <select id="target">
+                    <option value="sb3">
+                        Scratch 3.0 (.sb3)
+                    </option>
+                </select>
+            </div>
+
+            <label class="checkbox-option">
+                <input
+                    type="checkbox"
+                    id="includeRom"
+                    checked
+                >
+
+                <span>
+                    <strong>Include ROM data</strong>
+                    <small>
+                        Store the ROM inside the generated project.
+                    </small>
+                </span>
+            </label>
+
+            <label class="checkbox-option">
+                <input
+                    type="checkbox"
+                    id="generateEmulator"
+                    checked
+                >
+
+                <span>
+                    <strong>Generate emulator</strong>
+                    <small>
+                        Include the Genesis compatibility layer.
+                    </small>
+                </span>
+            </label>
+
+            <label class="checkbox-option">
+                <input
+                    type="checkbox"
+                    id="optimize"
+                >
+
+                <span>
+                    <strong>Experimental optimizations</strong>
+                    <small>
+                        Attempt to reduce generated Scratch workload.
+                    </small>
+                </span>
+            </label>
+
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-title">
+            <h2>3. Compile</h2>
+        </div>
+
+        <button
+            id="compileButton"
+            class="compile-button"
+            type="button"
+            disabled
+        >
+            Compile to SB3
+        </button>
+
+        <div
+            id="progressContainer"
+            class="progress-container hidden"
+        >
+            <div class="progress-track">
+                <div
+                    id="progressBar"
+                    class="progress-bar"
+                ></div>
+            </div>
+
+            <div class="progress-info">
+                <span id="progressText">
+                    Preparing...
+                </span>
+
+                <span id="progressPercent">
+                    0%
+                </span>
+            </div>
+        </div>
+
+        <div
+            id="status"
+            class="status"
+        >
+            Select a Genesis ROM to begin.
+        </div>
+    </section>
+
+    <section
+        id="result"
+        class="panel result-panel hidden"
+    >
+        <div class="result-icon">
+            ✓
+        </div>
+
+        <div class="result-content">
+            <h2>Compilation Complete</h2>
+
+            <p id="resultText">
+                Your Scratch project is ready.
+            </p>
+
+            <button
+                id="downloadButton"
+                class="download-button"
+                type="button"
+            >
+                Download .sb3
+            </button>
+        </div>
+    </section>
+
+    <section class="panel info-panel">
+        <h2>About Genesis2SB3</h2>
+
+        <p>
+            Genesis2SB3 is a browser-based compiler designed to
+            convert Sega Genesis software into Scratch 3.0 projects.
+        </p>
+
+        <div class="architecture">
+            <div class="architecture-step">
+                <span>01</span>
+                <strong>ROM</strong>
+                <small>Genesis binary</small>
+            </div>
+
+            <div class="architecture-arrow">→</div>
+
+            <div class="architecture-step">
+                <span>02</span>
+                <strong>Parse</strong>
+                <small>ROM + CPU data</small>
+            </div>
+
+            <div class="architecture-arrow">→</div>
+
+            <div class="architecture-step">
+                <span>03</span>
+                <strong>Compile</strong>
+                <small>Scratch runtime</small>
+            </div>
+
+            <div class="architecture-arrow">→</div>
+
+            <div class="architecture-step">
+                <span>04</span>
+                <strong>.SB3</strong>
+                <small>Scratch project</small>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div>
+            <strong>Genesis2SB3</strong>
+        </div>
+
+        <div>
+            ROM processing is performed locally in your browser.
+        </div>
+    </footer>
+
+</main>
+
+<script src="app.js"></script>
+
+</body>
+</html>
