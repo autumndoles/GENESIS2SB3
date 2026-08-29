@@ -695,7 +695,13 @@ function formatBytes(bytes) {
         bytes / 1048576
     ).toFixed(2)} MB`;
 }
-
+function formatHex(value, digits = 8) {
+    return "0x" +
+        (value >>> 0)
+            .toString(16)
+            .toUpperCase()
+            .padStart(digits, "0");
+}
 
 /* =========================================================
    COMPILER
