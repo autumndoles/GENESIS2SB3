@@ -1,0 +1,658 @@
+* {
+  box-sizing: border-box;
+  }
+
+:root {
+font-family:
+Inter,
+system-ui,
+-apple-system,
+BlinkMacSystemFont,
+"Segoe UI",
+sans-serif;
+
+```
+color: #f5f5f5;
+background: #090909;
+```
+
+}
+
+html {
+min-height: 100%;
+}
+
+body {
+margin: 0;
+min-height: 100vh;
+background:
+radial-gradient(
+circle at top,
+#202020 0%,
+#0d0d0d 45%,
+#070707 100%
+);
+}
+
+button,
+input,
+select {
+font: inherit;
+}
+
+button {
+cursor: pointer;
+}
+
+.app {
+width: min(100% - 32px, 1000px);
+margin: 0 auto;
+padding: 32px 0 50px;
+}
+
+/* =========================================================
+HEADER
+========================================================= */
+
+.header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 20px;
+padding: 8px 0 30px;
+}
+
+.logo {
+display: flex;
+flex-direction: column;
+gap: 4px;
+}
+
+.logo-main {
+font-size: 30px;
+font-weight: 800;
+letter-spacing: -1px;
+}
+
+.logo-sub {
+color: #999;
+font-size: 14px;
+}
+
+.header-badge {
+padding: 7px 11px;
+border: 1px solid #333;
+border-radius: 999px;
+color: #aaa;
+font-size: 11px;
+font-weight: 700;
+letter-spacing: 1px;
+}
+
+/* =========================================================
+HERO
+========================================================= */
+
+.hero {
+padding: 35px 0 40px;
+}
+
+.hero h1 {
+max-width: 760px;
+margin: 0 0 14px;
+font-size: clamp(32px, 6vw, 58px);
+line-height: 1;
+letter-spacing: -2px;
+}
+
+.hero p {
+max-width: 680px;
+margin: 0;
+color: #aaa;
+font-size: 17px;
+line-height: 1.6;
+}
+
+/* =========================================================
+PANELS
+========================================================= */
+
+.panel {
+margin-bottom: 18px;
+padding: 24px;
+border: 1px solid #292929;
+border-radius: 14px;
+background: rgba(18, 18, 18, 0.92);
+box-shadow:
+0 12px 35px rgba(0, 0, 0, 0.22);
+}
+
+.panel-title {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 15px;
+margin-bottom: 20px;
+}
+
+.panel-title h2 {
+margin: 0;
+font-size: 18px;
+font-weight: 700;
+}
+
+#romStatus {
+color: #777;
+font-size: 13px;
+}
+
+/* =========================================================
+DROP ZONE
+========================================================= */
+
+.drop-zone {
+display: flex;
+min-height: 250px;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+padding: 35px 20px;
+border: 2px dashed #333;
+border-radius: 12px;
+background: #0d0d0d;
+text-align: center;
+transition:
+border-color 0.15s ease,
+background 0.15s ease,
+transform 0.15s ease;
+}
+
+.drop-zone:hover,
+.drop-zone.dragging {
+border-color: #777;
+background: #151515;
+}
+
+.drop-zone.dragging {
+transform: scale(1.01);
+}
+
+.drop-zone.has-rom {
+border-style: solid;
+}
+
+.drop-icon {
+display: flex;
+width: 54px;
+height: 54px;
+align-items: center;
+justify-content: center;
+margin-bottom: 18px;
+border: 1px solid #3a3a3a;
+border-radius: 50%;
+color: #ddd;
+font-size: 30px;
+font-weight: 300;
+}
+
+.drop-title {
+margin-bottom: 7px;
+font-size: 18px;
+font-weight: 700;
+}
+
+.drop-subtitle {
+color: #888;
+font-size: 14px;
+}
+
+.drop-formats {
+margin-top: 18px;
+color: #555;
+font-family:
+"SFMono-Regular",
+Consolas,
+"Liberation Mono",
+monospace;
+font-size: 11px;
+letter-spacing: 0.5px;
+}
+
+/* =========================================================
+ROM INFO
+========================================================= */
+
+.rom-info {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 15px;
+margin-top: 12px;
+padding: 15px 17px;
+border: 1px solid #292929;
+border-radius: 10px;
+background: #101010;
+}
+
+.rom-details {
+min-width: 0;
+}
+
+.rom-name {
+overflow: hidden;
+margin-bottom: 4px;
+color: #eee;
+font-weight: 600;
+text-overflow: ellipsis;
+white-space: nowrap;
+}
+
+.rom-size {
+color: #777;
+font-family:
+"SFMono-Regular",
+Consolas,
+"Liberation Mono",
+monospace;
+font-size: 12px;
+}
+
+/* =========================================================
+OPTIONS
+========================================================= */
+
+.option-grid {
+display: grid;
+grid-template-columns:
+repeat(2, minmax(0, 1fr));
+gap: 12px;
+}
+
+.option {
+display: flex;
+flex-direction: column;
+gap: 8px;
+}
+
+.option label {
+color: #888;
+font-size: 13px;
+}
+
+select {
+width: 100%;
+padding: 12px 13px;
+border: 1px solid #333;
+border-radius: 8px;
+outline: none;
+background: #0c0c0c;
+color: #eee;
+}
+
+select:focus {
+border-color: #666;
+}
+
+.checkbox-option {
+display: flex;
+min-height: 72px;
+align-items: flex-start;
+gap: 12px;
+padding: 14px;
+border: 1px solid #292929;
+border-radius: 9px;
+background: #0d0d0d;
+cursor: pointer;
+}
+
+.checkbox-option:hover {
+background: #131313;
+}
+
+.checkbox-option input {
+width: 17px;
+height: 17px;
+margin: 2px 0 0;
+accent-color: #fff;
+}
+
+.checkbox-option span {
+display: flex;
+flex-direction: column;
+gap: 4px;
+}
+
+.checkbox-option strong {
+font-size: 14px;
+}
+
+.checkbox-option small {
+color: #777;
+font-size: 12px;
+line-height: 1.4;
+}
+
+/* =========================================================
+BUTTONS
+========================================================= */
+
+.compile-button,
+.download-button {
+width: 100%;
+padding: 15px 20px;
+border: 0;
+border-radius: 9px;
+background: #f1f1f1;
+color: #090909;
+font-size: 15px;
+font-weight: 800;
+transition:
+background 0.15s ease,
+transform 0.1s ease,
+opacity 0.15s ease;
+}
+
+.compile-button:hover:not(:disabled),
+.download-button:hover {
+background: #fff;
+transform: translateY(-1px);
+}
+
+.compile-button:active:not(:disabled),
+.download-button:active {
+transform: translateY(0);
+}
+
+.compile-button:disabled {
+cursor: not-allowed;
+opacity: 0.35;
+}
+
+.secondary-button {
+padding: 9px 13px;
+border: 1px solid #333;
+border-radius: 7px;
+background: #151515;
+color: #aaa;
+font-size: 12px;
+}
+
+.secondary-button:hover {
+border-color: #555;
+color: #fff;
+}
+
+/* =========================================================
+PROGRESS
+========================================================= */
+
+.progress-container {
+margin-top: 20px;
+}
+
+.progress-track {
+width: 100%;
+height: 8px;
+overflow: hidden;
+border-radius: 999px;
+background: #252525;
+}
+
+.progress-bar {
+width: 0;
+height: 100%;
+border-radius: inherit;
+background: #eee;
+transition: width 0.2s ease;
+}
+
+.progress-info {
+display: flex;
+justify-content: space-between;
+gap: 15px;
+margin-top: 9px;
+color: #777;
+font-family:
+"SFMono-Regular",
+Consolas,
+"Liberation Mono",
+monospace;
+font-size: 12px;
+}
+
+/* =========================================================
+STATUS
+========================================================= */
+
+.status {
+margin-top: 14px;
+color: #777;
+font-size: 13px;
+line-height: 1.5;
+}
+
+.status.success {
+color: #bdbdbd;
+}
+
+.status.warning {
+color: #aaa;
+}
+
+.status.error {
+color: #ddd;
+}
+
+/* =========================================================
+RESULT
+========================================================= */
+
+.result-panel {
+display: flex;
+align-items: center;
+gap: 20px;
+}
+
+.result-icon {
+display: flex;
+width: 48px;
+height: 48px;
+flex: 0 0 48px;
+align-items: center;
+justify-content: center;
+border: 1px solid #444;
+border-radius: 50%;
+color: #eee;
+font-size: 22px;
+}
+
+.result-content {
+flex: 1;
+}
+
+.result-content h2 {
+margin: 0 0 6px;
+font-size: 19px;
+}
+
+.result-content p {
+margin: 0 0 16px;
+color: #888;
+font-size: 13px;
+}
+
+.download-button {
+width: auto;
+min-width: 180px;
+}
+
+/* =========================================================
+ABOUT / ARCHITECTURE
+========================================================= */
+
+.info-panel p {
+max-width: 750px;
+color: #888;
+font-size: 14px;
+line-height: 1.6;
+}
+
+.architecture {
+display: flex;
+align-items: stretch;
+gap: 10px;
+margin-top: 24px;
+}
+
+.architecture-step {
+display: flex;
+min-width: 0;
+flex: 1;
+flex-direction: column;
+gap: 5px;
+padding: 15px;
+border: 1px solid #292929;
+border-radius: 9px;
+background: #0d0d0d;
+}
+
+.architecture-step span {
+color: #555;
+font-family:
+"SFMono-Regular",
+Consolas,
+"Liberation Mono",
+monospace;
+font-size: 10px;
+}
+
+.architecture-step strong {
+font-size: 14px;
+}
+
+.architecture-step small {
+color: #666;
+font-size: 11px;
+}
+
+.architecture-arrow {
+display: flex;
+align-items: center;
+justify-content: center;
+color: #555;
+font-size: 18px;
+}
+
+/* =========================================================
+FOOTER
+========================================================= */
+
+.footer {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 15px;
+padding: 20px 4px;
+color: #555;
+font-size: 11px;
+}
+
+.footer strong {
+color: #777;
+}
+
+/* =========================================================
+UTILITIES
+========================================================= */
+
+.hidden {
+display: none !important;
+}
+
+/* =========================================================
+RESPONSIVE
+========================================================= */
+
+@media (max-width: 700px) {
+.app {
+width: min(100% - 20px, 1000px);
+padding-top: 20px;
+}
+
+```
+.header {
+    align-items: flex-start;
+    flex-direction: column;
+}
+
+.header-badge {
+    display: none;
+}
+
+.hero {
+    padding: 25px 0 30px;
+}
+
+.hero h1 {
+    font-size: 38px;
+    letter-spacing: -1.5px;
+}
+
+.hero p {
+    font-size: 15px;
+}
+
+.panel {
+    padding: 18px;
+}
+
+.option-grid {
+    grid-template-columns: 1fr;
+}
+
+.architecture {
+    flex-direction: column;
+}
+
+.architecture-arrow {
+    transform: rotate(90deg);
+    min-height: 15px;
+}
+
+.result-panel {
+    align-items: flex-start;
+    flex-direction: column;
+}
+
+.download-button {
+    width: 100%;
+}
+
+.footer {
+    align-items: flex-start;
+    flex-direction: column;
+}
+```
+
+}
+
+@media (max-width: 450px) {
+.panel-title {
+align-items: flex-start;
+flex-direction: column;
+}
+
+```
+.rom-info {
+    align-items: flex-start;
+    flex-direction: column;
+}
+
+.secondary-button {
+    width: 100%;
+}
+
+.drop-zone {
+    min-height: 210px;
+}
+}
