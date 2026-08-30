@@ -1,3 +1,30 @@
+const romInput = document.getElementById("romInput");
+
+romInput.addEventListener("change", (event) => {
+    console.log("FILE INPUT FIRED");
+
+    const file = event.target.files[0];
+
+    if (!file) {
+        console.log("NO FILE");
+        return;
+    }
+
+    console.log("NAME:", file.name);
+    console.log("TYPE:", file.type);
+    console.log("SIZE:", file.size);
+});
+
+
+
+
+
+
+
+
+
+
+
 const VERSION = "0.2.1";
 
 let currentROM = null;
