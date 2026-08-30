@@ -1,4 +1,4 @@
-const VERSION = "0.1.4";
+const VERSION = "0.2.0";
 
 let currentROM = null;
 let currentROMData = null;
@@ -18,7 +18,8 @@ const romSize = document.getElementById("romSize");
 const romStatus = document.getElementById("romStatus");
 const removeRom = document.getElementById("removeRom");
 
-const compileButton = document.getElementById("compileButton");
+const compileButton =
+    document.getElementById("compileButton");
 
 const progressContainer =
     document.getElementById("progressContainer");
@@ -50,11 +51,6 @@ const downloadButton =
 ========================================================= */
 
 if (romInput) {
-    /*
-     * Do not restrict by extension.
-     *
-     * This allows .md files and unusual ROM filenames.
-     */
     romInput.setAttribute("accept", "*/*");
 }
 
@@ -63,7 +59,7 @@ if (compileButton) {
 }
 
 console.log(
-    `Genesis2SB3 v${VERSION} loaded.`
+    `Genesis2SB3 v${VERSION} initialized`
 );
 
 
@@ -83,14 +79,7 @@ if (romInput) {
                 return;
             }
 
-            const file = files[0];
-
-            console.log(
-                "Selected file:",
-                file.name
-            );
-
-            await loadROM(file);
+            await loadROM(files[0]);
         }
     );
 }
@@ -114,6 +103,7 @@ if (dropZone) {
         }
     );
 
+
     dropZone.addEventListener(
         "dragleave",
         function() {
@@ -123,6 +113,7 @@ if (dropZone) {
             );
         }
     );
+
 
     dropZone.addEventListener(
         "drop",
@@ -141,14 +132,7 @@ if (dropZone) {
                 return;
             }
 
-            const file = files[0];
-
-            console.log(
-                "Dropped file:",
-                file.name
-            );
-
-            await loadROM(file);
+            await loadROM(files[0]);
         }
     );
 }
@@ -163,6 +147,7 @@ async function loadROM(file) {
     resetCompilation();
 
     if (!file) {
+
         setStatus(
             "No file was selected.",
             "error"
@@ -171,7 +156,9 @@ async function loadROM(file) {
         return;
     }
 
+
     if (file.size === 0) {
+
         setStatus(
             "The selected file is empty.",
             "error"
@@ -180,64 +167,35 @@ async function loadROM(file) {
         return;
     }
 
+
     try {
 
         setStatus(
             `Reading ${file.name}...`
         );
 
-        /*
-         * Read the file as raw binary data.
-         *
-         * The filename extension does NOT matter here.
-         */
+
         const buffer =
             await file.arrayBuffer();
+
 
         let data =
             new Uint8Array(buffer);
 
-        console.log(
-            "File successfully loaded."
-        );
 
         console.log(
-            "Filename:",
+            "ROM loaded:",
             file.name
         );
 
         console.log(
-            "MIME type:",
-            file.type || "(none)"
+            "ROM size:",
+            data.length
         );
 
-        console.log(
-            "File size:",
-            data.length,
-            "bytes"
-        );
-
-        console.log(
-            "First 32 bytes:",
-            Array.from(
-                data.slice(0, 32)
-            )
-                .map(
-                    byte =>
-                        byte
-                            .toString(16)
-                            .padStart(2, "0")
-                            .toUpperCase()
-                )
-                .join(" ")
-        );
-
-
-        /* =================================================
-           SMD DETECTION
-        ================================================= */
 
         let wasSMD = false;
+
 
         if (isDefinitelySMD(data)) {
 
@@ -249,25 +207,12 @@ async function loadROM(file) {
                 deinterleaveSMD(data);
 
             wasSMD = true;
-
-            console.log(
-                "SMD deinterleaved."
-            );
         }
 
-
-        /* =================================================
-           GENESIS HEADER DETECTION
-        ================================================= */
 
         const info =
             parseGenesisROM(data);
 
-
-        /* =================================================
-           IMPORTANT:
-           FILE LOADING AND HEADER DETECTION ARE SEPARATE.
-        ================================================= */
 
         currentROM =
             file;
@@ -279,39 +224,15 @@ async function loadROM(file) {
             info;
 
 
-        /* =================================================
-           ALWAYS DISPLAY THE LOADED FILE
-        ================================================= */
-
         displayROMInfo();
 
 
-        /* =================================================
-           HEADER FOUND
-        ================================================= */
-
         if (info.headerFound) {
-
-            console.log(
-                "Genesis header detected."
-            );
-
-            console.log(
-                "Title:",
-                info.title
-            );
-
-            console.log(
-                "Reset vector:",
-                formatHex(
-                    info.resetVector
-                )
-            );
 
             if (wasSMD) {
 
                 setStatus(
-                    `${info.title} detected. SMD ROM converted successfully.`,
+                    `${info.title} detected. SMD format converted.`,
                     "success"
                 );
 
@@ -323,23 +244,8 @@ async function loadROM(file) {
                 );
             }
 
-        }
+        } else {
 
-        /* =================================================
-           HEADER NOT FOUND
-        ================================================= */
-
-        else {
-
-            console.warn(
-                "No standard Genesis header was detected."
-            );
-
-            /*
-             * DO NOT reject the file.
-             *
-             * It was successfully loaded.
-             */
             setStatus(
                 `${file.name} loaded successfully. Genesis header not detected.`,
                 "warning"
@@ -347,21 +253,15 @@ async function loadROM(file) {
         }
 
 
-        /* =================================================
-           ENABLE COMPILER
-        ================================================= */
-
         if (compileButton) {
+
             compileButton.disabled =
                 false;
         }
 
-    }
-
-    catch (error) {
+    } catch (error) {
 
         console.error(
-            "ROM loading failed:",
             error
         );
 
@@ -374,16 +274,11 @@ async function loadROM(file) {
 
 
 /* =========================================================
-   FIND GENESIS HEADER
+   GENESIS HEADER
 ========================================================= */
 
 function findGenesisHeader(data) {
 
-    /*
-     * Standard Genesis cartridge header.
-     *
-     * "SEGA" normally appears at 0x100.
-     */
     if (
         data.length >= 0x104 &&
         readASCII(
@@ -397,9 +292,6 @@ function findGenesisHeader(data) {
     }
 
 
-    /*
-     * Search the file as a fallback.
-     */
     for (
         let offset = 0;
         offset + 4 <= data.length;
@@ -417,12 +309,13 @@ function findGenesisHeader(data) {
         }
     }
 
+
     return -1;
 }
 
 
 /* =========================================================
-   PARSE GENESIS HEADER
+   PARSE GENESIS ROM
 ========================================================= */
 
 function parseGenesisROM(data) {
@@ -430,9 +323,11 @@ function parseGenesisROM(data) {
     const header =
         findGenesisHeader(data);
 
+
     if (header < 0) {
 
         return {
+
             headerFound: false,
 
             title: null,
@@ -579,7 +474,7 @@ function parseGenesisROM(data) {
 
 
 /* =========================================================
-   BINARY READERS
+   BINARY HELPERS
 ========================================================= */
 
 function read16BE(data, offset) {
@@ -590,6 +485,7 @@ function read16BE(data, offset) {
     ) {
         return 0;
     }
+
 
     return (
         (data[offset] << 8) |
@@ -606,6 +502,7 @@ function read32BE(data, offset) {
     ) {
         return 0;
     }
+
 
     return (
         data[offset] * 0x1000000 +
@@ -624,6 +521,7 @@ function readASCII(
 
     let text = "";
 
+
     for (
         let i = 0;
         i < length &&
@@ -633,6 +531,7 @@ function readASCII(
 
         const value =
             data[offset + i];
+
 
         if (
             value >= 32 &&
@@ -650,6 +549,7 @@ function readASCII(
         }
     }
 
+
     return text
         .replace(/\s+/g, " ")
         .trim();
@@ -657,7 +557,7 @@ function readASCII(
 
 
 /* =========================================================
-   FORMATTERS
+   FORMATTING
 ========================================================= */
 
 function formatBytes(bytes) {
@@ -666,12 +566,14 @@ function formatBytes(bytes) {
         return `${bytes} B`;
     }
 
+
     if (bytes < 1048576) {
 
         return `${(
             bytes / 1024
         ).toFixed(2)} KB`;
     }
+
 
     return `${(
         bytes / 1048576
@@ -698,7 +600,7 @@ function formatHex(
 
 
 /* =========================================================
-   CHECKSUM
+   GENESIS CHECKSUM
 ========================================================= */
 
 function calculateGenesisChecksum(data) {
@@ -706,7 +608,10 @@ function calculateGenesisChecksum(data) {
     const header =
         findGenesisHeader(data);
 
-    let start = 0x200;
+
+    let start =
+        0x200;
+
 
     let end =
         data.length - 1;
@@ -719,6 +624,7 @@ function calculateGenesisChecksum(data) {
                 data,
                 header + 0x80
             );
+
 
         const headerEnd =
             read32BE(
@@ -782,6 +688,7 @@ function isDefinitelySMD(data) {
         data.length <
         512 + 16384
     ) {
+
         return false;
     }
 
@@ -790,6 +697,7 @@ function isDefinitelySMD(data) {
         (data.length - 512) %
         16384 !== 0
     ) {
+
         return false;
     }
 
@@ -805,6 +713,7 @@ function deinterleaveSMD(data) {
 
     const body =
         data.slice(512);
+
 
     const output =
         new Uint8Array(
@@ -824,6 +733,7 @@ function deinterleaveSMD(data) {
                 body.length -
                 blockStart
             );
+
 
         const half =
             Math.floor(
@@ -872,6 +782,7 @@ function deinterleaveSMD(data) {
 function displayROMInfo() {
 
     if (romInfo) {
+
         romInfo.classList.remove(
             "hidden"
         );
@@ -897,7 +808,6 @@ function displayROMInfo() {
     if (romStatus) {
 
         romStatus.textContent =
-            currentROMInfo &&
             currentROMInfo.headerFound
 
                 ? "Genesis ROM detected"
@@ -952,19 +862,19 @@ if (compileButton) {
 
                 await compileROM();
 
+
                 setStatus(
-                    "Scratch project generated successfully.",
+                    "SB3 project generated successfully.",
                     "success"
                 );
 
-            }
-
-            catch (error) {
+            } catch (error) {
 
                 console.error(
-                    "Compilation error:",
+                    "Compilation failed:",
                     error
                 );
+
 
                 setStatus(
                     `Compilation failed: ${error.message}`,
@@ -981,7 +891,7 @@ if (compileButton) {
 
 
 /* =========================================================
-   COMPILE ROM
+   COMPILE
 ========================================================= */
 
 async function compileROM() {
@@ -1003,56 +913,24 @@ async function compileROM() {
 
     setProgress(
         25,
-        "Analyzing ROM data..."
-    );
-
-    await delay(50);
-
-
-    console.log(
-        "Initial stack pointer:",
-        formatHex(
-            info.initialSP
-        )
-    );
-
-
-    console.log(
-        "Reset vector:",
-        formatHex(
-            info.resetVector
-        )
-    );
-
-
-    setProgress(
-        45,
-        "Preparing Scratch runtime..."
-    );
-
-    await delay(50);
-
-
-    const instructionWords =
-        Math.floor(
-            currentROMData.length /
-            2
-        );
-
-
-    setProgress(
-        65,
-        "Creating project.json..."
+        "Analyzing Genesis header..."
     );
 
     await delay(50);
 
 
     const project =
-        createScratchProject(
-            info,
-            instructionWords
+        await createScratchProject(
+            info
         );
+
+
+    setProgress(
+        55,
+        "Creating Scratch assets..."
+    );
+
+    await delay(50);
 
 
     const projectJSON =
@@ -1067,22 +945,96 @@ async function compileROM() {
         );
 
 
+    const backdropSVG =
+        createBackdropSVG(
+            info
+        );
+
+
+    const backdropBytes =
+        new TextEncoder().encode(
+            backdropSVG
+        );
+
+
+    const backdropHash =
+        await md5Hex(
+            backdropBytes
+        );
+
+
+    /*
+     * Update the asset references with
+     * the actual hash.
+     */
+    project.targets[0]
+        .costumes[0]
+        .assetId =
+        backdropHash;
+
+
+    project.targets[0]
+        .costumes[0]
+        .md5ext =
+        `${backdropHash}.svg`;
+
+
+    /*
+     * Sprite costume uses the same SVG.
+     */
+    project.targets[1]
+        .costumes[0]
+        .assetId =
+        backdropHash;
+
+
+    project.targets[1]
+        .costumes[0]
+        .md5ext =
+        `${backdropHash}.svg`;
+
+
+    /*
+     * Re-serialize after inserting hash.
+     */
+    const finalProjectJSON =
+        JSON.stringify(
+            project
+        );
+
+
+    const finalProjectBytes =
+        new TextEncoder().encode(
+            finalProjectJSON
+        );
+
+
     setProgress(
-        85,
+        75,
         "Building SB3 archive..."
     );
+
 
     await delay(50);
 
 
     const zip =
         createZIP([
+
             {
                 name:
                     "project.json",
 
                 data:
-                    projectBytes
+                    finalProjectBytes
+            },
+
+            {
+                name:
+                    `${backdropHash}.svg`,
+
+                data:
+                    backdropBytes
             }
         ]);
 
@@ -1120,29 +1072,16 @@ async function compileROM() {
 
 
         resultText.textContent =
-            `${title} was converted into a Scratch project. ` +
-            `ROM size: ${formatBytes(
-                currentROMData.length
-            )}.`;
+            `${title} was packaged as a Scratch 3 project.`;
     }
 }
 
 
 /* =========================================================
-   SCRATCH PROJECT
+   CREATE SCRATCH PROJECT
 ========================================================= */
 
-function createScratchProject(
-    info,
-    instructionWords
-) {
-
-    const flagID =
-        "genesis_flag";
-
-    const sayID =
-        "genesis_say";
-
+async function createScratchProject(info) {
 
     const title =
         cleanScratchText(
@@ -1152,25 +1091,58 @@ function createScratchProject(
         );
 
 
+    const flagID =
+        "genesis_flag_01";
+
+
+    const sayID =
+        "genesis_say_01";
+
+
+    const spriteFlagID =
+        "sprite_flag_01";
+
+
+    /*
+     * Temporary placeholder hash.
+     *
+     * It gets replaced with the actual
+     * MD5 immediately before packaging.
+     */
+    const placeholder =
+        "00000000000000000000000000000000";
+
+
     return {
 
         targets: [
 
+            /* =============================================
+               STAGE
+            ============================================= */
+
             {
 
-                isStage: true,
+                isStage:
+                    true,
 
-                name: "Stage",
+                name:
+                    "Stage",
 
 
                 variables: {
 
-                    "romSize": [
-                        "ROM Size",
-                        currentROMData.length.toString()
+                    "rom_name": [
+                        "ROM Name",
+                        title
                     ],
 
-                    "resetVector": [
+                    "rom_size": [
+                        "ROM Size",
+                        currentROMData.length
+                    ],
+
+                    "reset_vector": [
                         "Reset Vector",
                         formatHex(
                             info.resetVector
@@ -1257,9 +1229,34 @@ function createScratchProject(
                 currentCostume:
                     0,
 
-                costumes: [],
+
+                costumes: [
+
+                    {
+
+                        assetId:
+                            placeholder,
+
+                        name:
+                            "backdrop1",
+
+                        md5ext:
+                            `${placeholder}.svg`,
+
+                        dataFormat:
+                            "svg",
+
+                        rotationCenterX:
+                            240,
+
+                        rotationCenterY:
+                            180
+                    }
+                ],
+
 
                 sounds: [],
+
 
                 volume:
                     100,
@@ -1268,12 +1265,141 @@ function createScratchProject(
                     0,
 
                 tempo:
-                    60
+                    60,
+
+                videoTransparency:
+                    50,
+
+                videoState:
+                    "on",
+
+                textToSpeechLanguage:
+                    null
+            },
+
+
+            /* =============================================
+               SPRITE
+            ============================================= */
+
+            {
+
+                isStage:
+                    false,
+
+                name:
+                    "Genesis Runtime",
+
+
+                variables: {},
+
+                lists: {},
+
+                broadcasts: {},
+
+
+                blocks: {
+
+                    [spriteFlagID]: {
+
+                        opcode:
+                            "event_whenflagclicked",
+
+                        next:
+                            null,
+
+                        parent:
+                            null,
+
+                        inputs: {},
+
+                        fields: {},
+
+                        shadow:
+                            false,
+
+                        topLevel:
+                            true,
+
+                        x:
+                            100,
+
+                        y:
+                            100
+                    }
+                },
+
+
+                comments: {},
+
+
+                currentCostume:
+                    0,
+
+
+                costumes: [
+
+                    {
+
+                        assetId:
+                            placeholder,
+
+                        name:
+                            "runtime",
+
+                        md5ext:
+                            `${placeholder}.svg`,
+
+                        dataFormat:
+                            "svg",
+
+                        bitmapResolution:
+                            1,
+
+                        rotationCenterX:
+                            240,
+
+                        rotationCenterY:
+                            180
+                    }
+                ],
+
+
+                sounds: [],
+
+
+                volume:
+                    100,
+
+                layerOrder:
+                    1,
+
+                visible:
+                    true,
+
+                x:
+                    0,
+
+                y:
+                    0,
+
+                size:
+                    100,
+
+                direction:
+                    90,
+
+                draggable:
+                    false,
+
+                rotationStyle:
+                    "all around"
             }
         ],
 
 
         monitors: [],
+
 
         extensions: [],
 
@@ -1284,58 +1410,112 @@ function createScratchProject(
                 "3.0.0",
 
             vm:
-                "12.0.0",
+                "0.2.0",
 
             agent:
                 `Genesis2SB3/${VERSION}`
-        },
-
-
-        genesis2sb3: {
-
-            version:
-                VERSION,
-
-            filename:
-                currentROM.name,
-
-            title:
-                info.title,
-
-            headerDetected:
-                info.headerFound,
-
-            console:
-                info.console,
-
-            serial:
-                info.serial,
-
-            region:
-                info.region,
-
-            romSize:
-                currentROMData.length,
-
-            instructionWords:
-                instructionWords,
-
-            resetVector:
-                info.resetVector,
-
-            initialStackPointer:
-                info.initialSP,
-
-            checksum:
-                info.checksum,
-
-            calculatedChecksum:
-                info.calculatedChecksum,
-
-            checksumMatches:
-                info.checksumMatches
         }
     };
+}
+
+
+/* =========================================================
+   BACKDROP SVG
+========================================================= */
+
+function createBackdropSVG(info) {
+
+    const title =
+        escapeXML(
+            cleanScratchText(
+                info.headerFound
+                    ? info.title
+                    : currentROM.name
+            )
+        );
+
+
+    const size =
+        escapeXML(
+            formatBytes(
+                currentROMData.length
+            )
+        );
+
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="480"
+    height="360"
+    viewBox="0 0 480 360">
+
+    <rect
+        width="480"
+        height="360"
+        fill="#111111"/>
+
+    <text
+        x="240"
+        y="150"
+        text-anchor="middle"
+        font-family="Arial, sans-serif"
+        font-size="28"
+        fill="#ffffff">
+        Genesis2SB3
+    </text>
+
+    <text
+        x="240"
+        y="195"
+        text-anchor="middle"
+        font-family="Arial, sans-serif"
+        font-size="18"
+        fill="#ffffff">
+        ${title}
+    </text>
+
+    <text
+        x="240"
+        y="225"
+        text-anchor="middle"
+        font-family="Arial, sans-serif"
+        font-size="14"
+        fill="#aaaaaa">
+        ROM size: ${size}
+    </text>
+
+</svg>`;
+}
+
+
+/* =========================================================
+   XML ESCAPING
+========================================================= */
+
+function escapeXML(text) {
+
+    return String(text)
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+        .replace(
+            /</g,
+            "&lt;"
+        )
+        .replace(
+            />/g,
+            "&gt;"
+        )
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+        .replace(
+            /'/g,
+            "&apos;"
+        );
 }
 
 
@@ -1346,19 +1526,335 @@ function createScratchProject(
 function cleanScratchText(text) {
 
     if (!text) {
+
         return "Unknown Genesis ROM";
     }
 
+
     return String(text)
-        .replace(/\0/g, "")
-        .replace(/\s+/g, " ")
+        .replace(
+            /\0/g,
+            ""
+        )
+        .replace(
+            /\s+/g,
+            " "
+        )
         .trim()
-        .slice(0, 200);
+        .slice(
+            0,
+            200
+        );
 }
 
 
 /* =========================================================
-   ZIP GENERATOR
+   MD5
+========================================================= */
+
+async function md5Hex(data) {
+
+    /*
+     * Web Crypto does not provide MD5.
+     *
+     * We therefore use a tiny pure-JS
+     * implementation below.
+     */
+
+    return md5(data);
+}
+
+
+/* =========================================================
+   MD5 IMPLEMENTATION
+========================================================= */
+
+function md5(input) {
+
+    let bytes =
+        input instanceof Uint8Array
+            ? input
+            : new Uint8Array(input);
+
+
+    const originalLength =
+        bytes.length;
+
+
+    const bitLength =
+        originalLength * 8;
+
+
+    const paddedLength =
+        ((originalLength + 9 + 63) >> 6) << 6;
+
+
+    const buffer =
+        new Uint8Array(
+            paddedLength
+        );
+
+
+    buffer.set(bytes);
+
+
+    buffer[originalLength] =
+        0x80;
+
+
+    const view =
+        new DataView(
+            buffer.buffer
+        );
+
+
+    view.setUint32(
+        paddedLength - 8,
+        bitLength >>> 0,
+        true
+    );
+
+
+    view.setUint32(
+        paddedLength - 4,
+        Math.floor(
+            bitLength / 0x100000000
+        ),
+        true
+    );
+
+
+    let a0 =
+        0x67452301;
+
+
+    let b0 =
+        0xefcdab89;
+
+
+    let c0 =
+        0x98badcfe;
+
+
+    let d0 =
+        0x10325476;
+
+
+    const s = [
+
+        7, 12, 17, 22,
+        7, 12, 17, 22,
+        7, 12, 17, 22,
+        7, 12, 17, 22,
+
+        5, 9, 14, 20,
+        5, 9, 14, 20,
+        5, 9, 14, 20,
+        5, 9, 14, 20,
+
+        4, 11, 16, 23,
+        4, 11, 16, 23,
+        4, 11, 16, 23,
+        4, 11, 16, 23,
+
+        6, 10, 15, 21,
+        6, 10, 15, 21,
+        6, 10, 15, 21,
+        6, 10, 15, 21
+    ];
+
+
+    const K = new Uint32Array(64);
+
+
+    for (
+        let i = 0;
+        i < 64;
+        i++
+    ) {
+
+        K[i] =
+            Math.floor(
+                Math.abs(
+                    Math.sin(i + 1)
+                ) *
+                0x100000000
+            ) >>> 0;
+    }
+
+
+    for (
+        let offset = 0;
+        offset < buffer.length;
+        offset += 64
+    ) {
+
+        const M =
+            new Uint32Array(16);
+
+
+        for (
+            let i = 0;
+            i < 16;
+            i++
+        ) {
+
+            M[i] =
+                view.getUint32(
+                    offset + i * 4,
+                    true
+                );
+        }
+
+
+        let A =
+            a0;
+
+        let B =
+            b0;
+
+        let C =
+            c0;
+
+        let D =
+            d0;
+
+
+        for (
+            let i = 0;
+            i < 64;
+            i++
+        ) {
+
+            let F;
+            let g;
+
+
+            if (i < 16) {
+
+                F =
+                    (B & C) |
+                    ((~B) & D);
+
+                g =
+                    i;
+
+            } else if (i < 32) {
+
+                F =
+                    (D & B) |
+                    ((~D) & C);
+
+                g =
+                    (5 * i + 1) % 16;
+
+            } else if (i < 48) {
+
+                F =
+                    B ^ C ^ D;
+
+                g =
+                    (3 * i + 5) % 16;
+
+            } else {
+
+                F =
+                    C ^
+                    (B | (~D));
+
+                g =
+                    (7 * i) % 16;
+            }
+
+
+            const temp =
+                D;
+
+
+            D =
+                C;
+
+
+            C =
+                B;
+
+
+            const sum =
+                (
+                    A +
+                    F +
+                    K[i] +
+                    M[g]
+                ) >>> 0;
+
+
+            B =
+                (
+                    B +
+                    leftRotate(
+                        sum,
+                        s[i]
+                    )
+                ) >>> 0;
+
+
+            A =
+                temp;
+        }
+
+
+        a0 =
+            (a0 + A) >>> 0;
+
+        b0 =
+            (b0 + B) >>> 0;
+
+        c0 =
+            (c0 + C) >>> 0;
+
+        d0 =
+            (d0 + D) >>> 0;
+    }
+
+
+    return [
+        a0,
+        b0,
+        c0,
+        d0
+    ]
+        .map(
+            value =>
+                value
+                    .toString(16)
+                    .padStart(
+                        8,
+                        "0"
+                    )
+                    .match(
+                        /../g
+                    )
+                    .reverse()
+                    .join("")
+        )
+        .join("");
+}
+
+
+function leftRotate(
+    value,
+    amount
+) {
+
+    return (
+        (value << amount) |
+        (value >>> (32 - amount))
+    ) >>> 0;
+}
+
+
+/* =========================================================
+   ZIP
 ========================================================= */
 
 function createZIP(files) {
@@ -1377,8 +1873,10 @@ function createZIP(files) {
                 file.name
             );
 
+
         const data =
             file.data;
+
 
         const checksum =
             crc32(data);
@@ -1591,7 +2089,9 @@ function concatBytes(...arrays) {
 
 
     for (const array of arrays) {
-        total += array.length;
+
+        total +=
+            array.length;
     }
 
 
@@ -1608,6 +2108,7 @@ function concatBytes(...arrays) {
             array,
             offset
         );
+
 
         offset +=
             array.length;
@@ -1632,7 +2133,8 @@ for (
     i++
 ) {
 
-    let value = i;
+    let value =
+        i;
 
 
     for (
@@ -1794,11 +2296,14 @@ function resetROM() {
 
 
     if (romInput) {
-        romInput.value = "";
+
+        romInput.value =
+            "";
     }
 
 
     if (romInfo) {
+
         romInfo.classList.add(
             "hidden"
         );
@@ -1806,6 +2311,7 @@ function resetROM() {
 
 
     if (result) {
+
         result.classList.add(
             "hidden"
         );
@@ -1813,6 +2319,7 @@ function resetROM() {
 
 
     if (progressContainer) {
+
         progressContainer.classList.add(
             "hidden"
         );
@@ -1820,6 +2327,7 @@ function resetROM() {
 
 
     if (dropZone) {
+
         dropZone.classList.remove(
             "has-rom"
         );
@@ -1827,12 +2335,14 @@ function resetROM() {
 
 
     if (romStatus) {
+
         romStatus.textContent =
             "No ROM selected";
     }
 
 
     if (compileButton) {
+
         compileButton.disabled =
             true;
     }
@@ -1855,6 +2365,7 @@ function resetCompilation() {
 
 
     if (result) {
+
         result.classList.add(
             "hidden"
         );
@@ -1862,6 +2373,7 @@ function resetCompilation() {
 
 
     if (progressContainer) {
+
         progressContainer.classList.add(
             "hidden"
         );
