@@ -1,4 +1,4 @@
-const VERSION = "0.1.2";
+const VERSION = "0.1.3";
 
 let currentROM = null;
 let currentROMData = null;
@@ -30,15 +30,8 @@ const downloadButton = document.getElementById("downloadButton");
 ========================================================= */
 
 if (romInput) {
-    /*
-     * DO NOT filter by extension.
-     *
-     * Some browsers handle .md strangely because they
-     * associate it with Markdown.
-     *
-     * We want the browser to give us the raw file and
-     * we'll determine what it is ourselves.
-     */
+    // Do not restrict by extension.
+    // .md Genesis ROMs must be allowed through.
     romInput.setAttribute("accept", "*/*");
 }
 
@@ -46,7 +39,7 @@ if (compileButton) {
     compileButton.disabled = true;
 }
 
-console.log(`Genesis2SB3 v${VERSION} loaded.`);
+console.log(`Genesis2SB3 v${VERSION} initialized.`);
 
 
 /* =========================================================
@@ -55,19 +48,11 @@ console.log(`Genesis2SB3 v${VERSION} loaded.`);
 
 if (romInput) {
     romInput.addEventListener("change", async function(event) {
-        const files = event.target.files;
+        const file = event.target.files[0];
 
-        if (!files || files.length === 0) {
-            return;
+        if (file) {
+            await loadROM(file);
         }
-
-        const file = files[0];
-
-        console.log("Selected file:", file.name);
-        console.log("Size:", file.size);
-        console.log("Type:", file.type);
-
-        await loadROM(file);
     });
 }
 
@@ -79,7 +64,6 @@ if (romInput) {
 if (dropZone) {
     dropZone.addEventListener("dragover", function(event) {
         event.preventDefault();
-
         dropZone.classList.add("dragging");
     });
 
@@ -92,17 +76,11 @@ if (dropZone) {
 
         dropZone.classList.remove("dragging");
 
-        const files = event.dataTransfer.files;
+        const file = event.dataTransfer.files[0];
 
-        if (!files || files.length === 0) {
-            return;
+        if (file) {
+            await loadROM(file);
         }
-
-        const file = files[0];
-
-        console.log("Dropped file:", file.name);
-
-        await loadROM(file);
     });
 }
 
@@ -114,102 +92,48 @@ if (dropZone) {
 async function loadROM(file) {
     resetCompilation();
 
-    if (!file) {
-        return;
-    }
-
-    if (file.size === 0) {
+    if (!file || file.size === 0) {
         setStatus(
             "The selected file is empty.",
             "error"
         );
-
         return;
     }
 
     try {
-        setStatus(
-            `Reading ${file.name}...`
-        );
+        setStatus(`Reading ${file.name} as binary data...`);
 
-        /*
-         * THIS IS THE IMPORTANT PART.
-         *
-         * File.arrayBuffer() reads the actual binary
-         * bytes regardless of the filename extension
-         * or MIME type.
-         */
-        const rawBuffer = await file.arrayBuffer();
+        const buffer = await file.arrayBuffer();
 
-        let data = new Uint8Array(rawBuffer);
+        let data = new Uint8Array(buffer);
 
+        console.log("File:", file.name);
+        console.log("Bytes:", data.length);
         console.log(
-            "Raw binary bytes:",
-            data.length
-        );
-
-        /*
-         * Show the first bytes in the console.
-         * This is extremely useful for debugging.
-         */
-        console.log(
-            "First 32 bytes:",
-            Array.from(
-                data.slice(0, 32)
-            )
-                .map(
-                    byte =>
-                        byte
-                            .toString(16)
-                            .padStart(2, "0")
-                            .toUpperCase()
+            "First bytes:",
+            Array.from(data.slice(0, 32))
+                .map(byte =>
+                    byte.toString(16)
+                        .padStart(2, "0")
+                        .toUpperCase()
                 )
                 .join(" ")
         );
 
         /*
-         * Detect SMD only from the actual file structure.
+         * Check for SMD before parsing.
          */
-        let wasSMD = false;
-
         if (isDefinitelySMD(data)) {
-            console.log(
-                "SMD format detected."
-            );
-
+            console.log("SMD format detected.");
             data = deinterleaveSMD(data);
-
-            wasSMD = true;
         }
 
-        /*
-         * Now inspect the actual Genesis header.
-         */
         const info = parseGenesisROM(data);
-
-        console.log(
-            "Genesis ROM information:",
-            info
-        );
-
-        /*
-         * IMPORTANT:
-         *
-         * We don't care whether the filename ends in
-         * .md, .bin, .gen, .smd, or something else.
-         *
-         * If the bytes contain a valid Genesis header,
-         * it's treated as a Genesis ROM.
-         */
 
         if (!info.headerFound) {
             setStatus(
-                "This file does not contain a recognizable Sega Genesis header.",
+                "No recognizable Sega Genesis header was found.",
                 "error"
-            );
-
-            console.warn(
-                "No Genesis header found."
             );
 
             return;
@@ -221,27 +145,17 @@ async function loadROM(file) {
 
         displayROMInfo();
 
-        if (wasSMD) {
-            setStatus(
-                `${info.title || file.name} detected. SMD format converted.`,
-                "success"
-            );
-        } else {
-            setStatus(
-                `${info.title || file.name} detected as a Sega Genesis ROM.`,
-                "success"
-            );
-        }
+        setStatus(
+            `${info.title} detected as a Sega Genesis ROM.`,
+            "success"
+        );
 
         if (compileButton) {
             compileButton.disabled = false;
         }
 
     } catch (error) {
-        console.error(
-            "ROM loading error:",
-            error
-        );
+        console.error(error);
 
         setStatus(
             `Could not read ROM: ${error.message}`,
@@ -252,36 +166,19 @@ async function loadROM(file) {
 
 
 /* =========================================================
-   GENESIS HEADER DETECTION
+   GENESIS DETECTION
 ========================================================= */
 
 function findGenesisHeader(data) {
-    /*
-     * The standard Genesis cartridge header contains
-     * "SEGA" at offset 0x100.
-     */
-
+    // Standard Genesis header location.
     if (
-        data.length >= 0x104
+        data.length >= 0x104 &&
+        readASCII(data, 0x100, 4) === "SEGA"
     ) {
-        const standard =
-            readASCII(
-                data,
-                0x100,
-                4
-            );
-
-        if (standard === "SEGA") {
-            return 0x100;
-        }
+        return 0x100;
     }
 
-    /*
-     * If it isn't at the standard location, search the
-     * entire file for SEGA.
-     *
-     * This helps with unusual dumps and headers.
-     */
+    // Fallback search.
     for (
         let offset = 0;
         offset + 4 <= data.length;
@@ -302,115 +199,102 @@ function findGenesisHeader(data) {
 
 
 /* =========================================================
-   GENESIS HEADER PARSER
+   GENESIS HEADER
 ========================================================= */
 
 function parseGenesisROM(data) {
-    const headerOffset =
-        findGenesisHeader(data);
+    const header = findGenesisHeader(data);
 
-    if (headerOffset < 0) {
+    if (header < 0) {
         return {
             headerFound: false
         };
     }
 
-    const h = headerOffset;
-
     const info = {
         headerFound: true,
 
-        headerOffset: h,
+        headerOffset: header,
 
         console:
-            readASCII(
-                data,
-                h,
-                16
-            ),
+            readASCII(data, header, 16),
 
         domesticTitle:
             readASCII(
                 data,
-                h + 0x20,
+                header + 0x20,
                 48
             ),
 
         internationalTitle:
             readASCII(
                 data,
-                h + 0x50,
+                header + 0x50,
                 48
             ),
 
         serial:
             readASCII(
                 data,
-                h + 0x60,
+                header + 0x60,
                 14
             ),
 
         version:
             readASCII(
                 data,
-                h + 0x6E,
+                header + 0x6E,
                 2
             ),
 
         checksum:
             read16BE(
                 data,
-                h + 0x7E
+                header + 0x7E
             ),
 
         romStart:
             read32BE(
                 data,
-                h + 0x80
+                header + 0x80
             ),
 
         romEnd:
             read32BE(
                 data,
-                h + 0x84
+                header + 0x84
             ),
 
         ramStart:
             read32BE(
                 data,
-                h + 0x88
+                header + 0x88
             ),
 
         ramEnd:
             read32BE(
                 data,
-                h + 0x8C
+                header + 0x8C
             ),
 
         region:
             readASCII(
                 data,
-                h + 0xF0,
+                header + 0xF0,
                 16
             ),
 
         initialSP:
-            read32BE(
-                data,
-                0
-            ),
+            read32BE(data, 0),
 
         resetVector:
-            read32BE(
-                data,
-                4
-            )
+            read32BE(data, 4)
     };
 
     info.title =
         info.internationalTitle ||
         info.domesticTitle ||
-        "Untitled Genesis ROM";
+        "Unknown Genesis Game";
 
     info.calculatedChecksum =
         calculateGenesisChecksum(data);
@@ -424,7 +308,7 @@ function parseGenesisROM(data) {
 
 
 /* =========================================================
-   BINARY READERS
+   BINARY HELPERS
 ========================================================= */
 
 function read16BE(data, offset) {
@@ -458,7 +342,7 @@ function read32BE(data, offset) {
 }
 
 function readASCII(data, offset, length) {
-    let result = "";
+    let text = "";
 
     for (
         let i = 0;
@@ -466,25 +350,41 @@ function readASCII(data, offset, length) {
         offset + i < data.length;
         i++
     ) {
-        const value =
-            data[offset + i];
+        const value = data[offset + i];
 
         if (
             value >= 32 &&
             value <= 126
         ) {
-            result +=
-                String.fromCharCode(
-                    value
-                );
+            text += String.fromCharCode(value);
         } else {
-            result += " ";
+            text += " ";
         }
     }
 
-    return result
+    return text
         .replace(/\s+/g, " ")
         .trim();
+}
+
+function formatBytes(bytes) {
+    if (bytes < 1024) {
+        return `${bytes} B`;
+    }
+
+    if (bytes < 1024 * 1024) {
+        return `${(bytes / 1024).toFixed(2)} KB`;
+    }
+
+    return `${(bytes / 1048576).toFixed(2)} MB`;
+}
+
+function formatHex(value, digits = 8) {
+    return "0x" +
+        (value >>> 0)
+            .toString(16)
+            .toUpperCase()
+            .padStart(digits, "0");
 }
 
 
@@ -493,8 +393,7 @@ function readASCII(data, offset, length) {
 ========================================================= */
 
 function calculateGenesisChecksum(data) {
-    const header =
-        findGenesisHeader(data);
+    const header = findGenesisHeader(data);
 
     let start = 0x200;
     let end = data.length - 1;
@@ -537,10 +436,7 @@ function calculateGenesisChecksum(data) {
         checksum =
             (
                 checksum +
-                read16BE(
-                    data,
-                    offset
-                )
+                read16BE(data, offset)
             ) & 0xFFFF;
     }
 
@@ -549,69 +445,45 @@ function calculateGenesisChecksum(data) {
 
 
 /* =========================================================
-   SMD DETECTION
+   SMD
 ========================================================= */
 
 function isDefinitelySMD(data) {
-    if (
-        data.length <
-        512 + 16384
-    ) {
+    if (data.length < 512 + 16384) {
         return false;
     }
 
     if (
-        (data.length - 512) %
-        16384 !== 0
+        (data.length - 512) % 16384 !== 0
     ) {
         return false;
     }
 
-    /*
-     * Typical SMD header signature.
-     */
-    if (
-        data[0] !== 0x03 ||
-        data[1] !== 0x00
-    ) {
-        return false;
-    }
-
-    return true;
+    return (
+        data[0] === 0x03 &&
+        data[1] === 0x00
+    );
 }
 
-
-/* =========================================================
-   SMD DEINTERLEAVING
-========================================================= */
-
 function deinterleaveSMD(data) {
-    const body =
-        data.slice(512);
+    const body = data.slice(512);
 
     const output =
-        new Uint8Array(
-            body.length
-        );
+        new Uint8Array(body.length);
 
     for (
         let blockStart = 0;
         blockStart < body.length;
         blockStart += 16384
     ) {
-        const blockEnd =
-            Math.min(
-                blockStart + 16384,
-                body.length
-            );
-
         const blockSize =
-            blockEnd - blockStart;
+            Math.min(
+                16384,
+                body.length - blockStart
+            );
 
         const half =
-            Math.floor(
-                blockSize / 2
-            );
+            Math.floor(blockSize / 2);
 
         for (
             let i = 0;
@@ -622,9 +494,7 @@ function deinterleaveSMD(data) {
                 blockStart + i * 2
             ] =
                 body[
-                    blockStart +
-                    half +
-                    i
+                    blockStart + half + i
                 ];
 
             output[
@@ -641,14 +511,12 @@ function deinterleaveSMD(data) {
 
 
 /* =========================================================
-   DISPLAY ROM
+   DISPLAY
 ========================================================= */
 
 function displayROMInfo() {
     if (romInfo) {
-        romInfo.classList.remove(
-            "hidden"
-        );
+        romInfo.classList.remove("hidden");
     }
 
     if (romName) {
@@ -669,42 +537,13 @@ function displayROMInfo() {
     }
 
     if (dropZone) {
-        dropZone.classList.add(
-            "has-rom"
-        );
+        dropZone.classList.add("has-rom");
     }
 }
 
 
 /* =========================================================
-   FORMAT BYTES
-========================================================= */
-
-function formatBytes(bytes) {
-    if (bytes < 1024) {
-        return `${bytes} B`;
-    }
-
-    if (bytes < 1048576) {
-        return `${(
-            bytes / 1024
-        ).toFixed(2)} KB`;
-    }
-
-    return `${(
-        bytes / 1048576
-    ).toFixed(2)} MB`;
-}
-function formatHex(value, digits = 8) {
-    return "0x" +
-        (value >>> 0)
-            .toString(16)
-            .toUpperCase()
-            .padStart(digits, "0");
-}
-
-/* =========================================================
-   COMPILER
+   COMPILE BUTTON
 ========================================================= */
 
 if (compileButton) {
@@ -732,12 +571,13 @@ if (compileButton) {
                 await compileROM();
 
                 setStatus(
-                    "ROM analysis complete.",
+                    "Valid Scratch project generated.",
                     "success"
                 );
 
             } catch (error) {
                 console.error(
+                    "Compilation error:",
                     error
                 );
 
@@ -754,7 +594,7 @@ if (compileButton) {
 
 
 /* =========================================================
-   COMPILE ROM
+   COMPILE
 ========================================================= */
 
 async function compileROM() {
@@ -770,21 +610,15 @@ async function compileROM() {
             currentROMData
         );
 
-    if (!info.headerFound) {
-        throw new Error(
-            "Genesis header not found."
-        );
-    }
-
     setProgress(
-        30,
+        25,
         "Reading 68000 reset vector..."
     );
 
     await delay(50);
 
     console.log(
-        "Initial stack pointer:",
+        "Initial SP:",
         formatHex(info.initialSP)
     );
 
@@ -794,20 +628,20 @@ async function compileROM() {
     );
 
     setProgress(
-        50,
+        45,
         "Analyzing ROM..."
     );
 
     await delay(50);
 
-    const instructionCount =
+    const instructionWords =
         Math.floor(
             currentROMData.length / 2
         );
 
     setProgress(
-        70,
-        "Building Scratch project..."
+        65,
+        "Creating Scratch project..."
     );
 
     await delay(50);
@@ -815,21 +649,17 @@ async function compileROM() {
     const project =
         createScratchProject(
             info,
-            instructionCount
+            instructionWords
         );
 
     setProgress(
-        85,
-        "Encoding project..."
+        80,
+        "Encoding project.json..."
     );
-
-    await delay(50);
 
     const projectJSON =
         JSON.stringify(
-            project,
-            null,
-            2
+            project
         );
 
     const projectBytes =
@@ -837,28 +667,34 @@ async function compileROM() {
             projectJSON
         );
 
+    await delay(50);
+
+    setProgress(
+        90,
+        "Building SB3 archive..."
+    );
+
+    const zip =
+        createZIP([
+            {
+                name: "project.json",
+                data: projectBytes
+            }
+        ]);
+
+    generatedSB3 =
+        new Blob(
+            [zip],
+            {
+                type:
+                    "application/zip"
+            }
+        );
+
     setProgress(
         100,
         "Compilation complete."
     );
-
-    generatedSB3 =
-        new Blob(
-            [
-                createStoredZip([
-                    {
-                        name:
-                            "project.json",
-                        data:
-                            projectBytes
-                    }
-                ])
-            ],
-            {
-                type:
-                    "application/x.scratch.sb3"
-            }
-        );
 
     if (result) {
         result.classList.remove(
@@ -868,49 +704,115 @@ async function compileROM() {
 
     if (resultText) {
         resultText.textContent =
-            `${info.title} loaded successfully. ` +
-            `ROM size: ${formatBytes(currentROMData.length)}. ` +
-            `Reset vector: ${formatHex(info.resetVector)}.`;
+            `${info.title} was converted into a Scratch project. ` +
+            `ROM size: ${formatBytes(currentROMData.length)}.`;
     }
 }
 
 
 /* =========================================================
-   SCRATCH PROJECT
+   VALID SCRATCH PROJECT
 ========================================================= */
 
 function createScratchProject(
     info,
-    instructionCount
+    instructionWords
 ) {
+    const flagID = "flag_1";
+    const sayID = "say_1";
+
+    const title =
+        cleanScratchText(
+            info.title
+        );
+
     return {
         targets: [
             {
                 isStage: true,
-                name: "Genesis2SB3",
+
+                name: "Stage",
 
                 variables: {
-                    rom_size: [
+                    "romSize": [
                         "ROM Size",
-                        currentROMData.length
+                        currentROMData.length.toString()
                     ],
 
-                    reset_vector: [
+                    "resetVector": [
                         "Reset Vector",
-                        info.resetVector
+                        formatHex(
+                            info.resetVector
+                        )
                     ]
                 },
 
                 lists: {},
+
                 broadcasts: {},
-                blocks: {},
+
+                blocks: {
+                    [flagID]: {
+                        opcode:
+                            "event_whenflagclicked",
+
+                        next:
+                            sayID,
+
+                        parent:
+                            null,
+
+                        inputs: {},
+
+                        fields: {},
+
+                        shadow: false,
+
+                        topLevel: true,
+
+                        x: 100,
+
+                        y: 100
+                    },
+
+                    [sayID]: {
+                        opcode:
+                            "looks_say",
+
+                        next:
+                            null,
+
+                        parent:
+                            flagID,
+
+                        inputs: {
+                            MESSAGE: [
+                                1,
+                                [
+                                    10,
+                                    `Genesis2SB3: ${title}`
+                                ]
+                            ]
+                        },
+
+                        fields: {},
+
+                        shadow: false,
+
+                        topLevel: false
+                    }
+                },
+
                 comments: {},
 
                 currentCostume: 0,
+
                 costumes: [],
+
                 sounds: [],
 
                 volume: 100,
+
                 layerOrder: 0,
 
                 tempo: 60
@@ -918,11 +820,15 @@ function createScratchProject(
         ],
 
         monitors: [],
+
         extensions: [],
 
         meta: {
             semver: "3.0.0",
-            vm: "0.2.0",
+
+            vm:
+                "12.0.0",
+
             agent:
                 `Genesis2SB3/${VERSION}`
         },
@@ -941,129 +847,298 @@ function createScratchProject(
             romSize:
                 currentROMData.length,
 
-            instructionWords:
-                instructionCount,
+            instructionWords,
 
             resetVector:
-                info.resetVector
+                info.resetVector,
+
+            initialStackPointer:
+                info.initialSP,
+
+            checksum:
+                info.checksum,
+
+            calculatedChecksum:
+                info.calculatedChecksum,
+
+            checksumMatches:
+                info.checksumMatches
         }
     };
 }
 
-
-/* =========================================================
-   PROGRESS
-========================================================= */
-
-function setProgress(percent, text) {
-    if (progressBar) {
-        progressBar.style.width =
-            `${percent}%`;
+function cleanScratchText(text) {
+    if (!text) {
+        return "Unknown Genesis Game";
     }
 
-    if (progressPercent) {
-        progressPercent.textContent =
-            `${percent}%`;
-    }
-
-    if (progressText) {
-        progressText.textContent =
-            text;
-    }
+    return text
+        .replace(/\0/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 200);
 }
 
 
 /* =========================================================
-   STATUS
+   SB3 ZIP GENERATOR
 ========================================================= */
 
-function setStatus(message, type = "") {
-    if (!status) {
-        return;
-    }
+function createZIP(files) {
+    const localParts = [];
+    const centralParts = [];
 
-    status.textContent =
-        message;
+    let offset = 0;
 
-    status.className =
-        "status";
+    for (const file of files) {
+        const nameBytes =
+            new TextEncoder().encode(
+                file.name
+            );
 
-    if (type) {
-        status.classList.add(
-            type
+        const data =
+            file.data;
+
+        const checksum =
+            crc32(data);
+
+        /*
+         * Local file header.
+         */
+        const localHeader =
+            concatBytes(
+                bytes(
+                    0x50,
+                    0x4B,
+                    0x03,
+                    0x04
+                ),
+
+                uint16LE(20), // version
+                uint16LE(0),  // flags
+                uint16LE(0),  // stored
+                uint16LE(0),  // time
+                uint16LE(0),  // date
+
+                uint32LE(checksum),
+
+                uint32LE(data.length),
+
+                uint32LE(data.length),
+
+                uint16LE(nameBytes.length),
+
+                uint16LE(0),
+
+                nameBytes
+            );
+
+        localParts.push(
+            localHeader,
+            data
         );
-    }
-}
 
+        /*
+         * Central directory entry.
+         */
+        const centralHeader =
+            concatBytes(
+                bytes(
+                    0x50,
+                    0x4B,
+                    0x01,
+                    0x02
+                ),
 
-/* =========================================================
-   RESET
-========================================================= */
+                uint16LE(20), // made by
+                uint16LE(20), // needed
 
-function resetCompilation() {
-    generatedSB3 = null;
+                uint16LE(0),  // flags
+                uint16LE(0),  // stored
+                uint16LE(0),  // time
+                uint16LE(0),  // date
 
-    if (result) {
-        result.classList.add(
-            "hidden"
+                uint32LE(checksum),
+
+                uint32LE(data.length),
+
+                uint32LE(data.length),
+
+                uint16LE(nameBytes.length),
+
+                uint16LE(0),
+
+                uint16LE(0),
+
+                uint16LE(0),
+
+                uint16LE(0),
+
+                uint32LE(0),
+
+                uint32LE(offset),
+
+                nameBytes
+            );
+
+        centralParts.push(
+            centralHeader
         );
+
+        offset +=
+            localHeader.length +
+            data.length;
     }
 
-    if (progressContainer) {
-        progressContainer.classList.add(
-            "hidden"
+    const localData =
+        concatBytes(
+            ...localParts
         );
-    }
-}
 
-function resetROM() {
-    currentROM = null;
-    currentROMData = null;
-    currentROMInfo = null;
-    generatedSB3 = null;
-
-    if (romInput) {
-        romInput.value = "";
-    }
-
-    if (romInfo) {
-        romInfo.classList.add(
-            "hidden"
+    const centralData =
+        concatBytes(
+            ...centralParts
         );
-    }
 
-    if (result) {
-        result.classList.add(
-            "hidden"
+    /*
+     * End of central directory.
+     */
+    const endRecord =
+        concatBytes(
+            bytes(
+                0x50,
+                0x4B,
+                0x05,
+                0x06
+            ),
+
+            uint16LE(0),
+            uint16LE(0),
+
+            uint16LE(files.length),
+            uint16LE(files.length),
+
+            uint32LE(
+                centralData.length
+            ),
+
+            uint32LE(
+                localData.length
+            ),
+
+            uint16LE(0)
         );
-    }
 
-    if (dropZone) {
-        dropZone.classList.remove(
-            "has-rom"
-        );
-    }
-
-    if (romStatus) {
-        romStatus.textContent =
-            "No ROM selected";
-    }
-
-    if (compileButton) {
-        compileButton.disabled =
-            true;
-    }
-
-    setStatus(
-        "Select a Genesis ROM to begin."
+    return concatBytes(
+        localData,
+        centralData,
+        endRecord
     );
 }
 
-if (removeRom) {
-    removeRom.addEventListener(
-        "click",
-        resetROM
-    );
+
+/* =========================================================
+   ZIP HELPERS
+========================================================= */
+
+function bytes(...values) {
+    return new Uint8Array(values);
+}
+
+function uint16LE(value) {
+    return new Uint8Array([
+        value & 0xFF,
+        (value >>> 8) & 0xFF
+    ]);
+}
+
+function uint32LE(value) {
+    return new Uint8Array([
+        value & 0xFF,
+        (value >>> 8) & 0xFF,
+        (value >>> 16) & 0xFF,
+        (value >>> 24) & 0xFF
+    ]);
+}
+
+function concatBytes(...arrays) {
+    let total = 0;
+
+    for (const array of arrays) {
+        total += array.length;
+    }
+
+    const output =
+        new Uint8Array(total);
+
+    let offset = 0;
+
+    for (const array of arrays) {
+        output.set(
+            array,
+            offset
+        );
+
+        offset += array.length;
+    }
+
+    return output;
+}
+
+
+/* =========================================================
+   CRC32
+========================================================= */
+
+const CRC_TABLE =
+    new Uint32Array(256);
+
+for (
+    let i = 0;
+    i < 256;
+    i++
+) {
+    let value = i;
+
+    for (
+        let j = 0;
+        j < 8;
+        j++
+    ) {
+        if (value & 1) {
+            value =
+                0xEDB88320 ^
+                (value >>> 1);
+        } else {
+            value >>>
+                = 1;
+        }
+    }
+
+    CRC_TABLE[i] =
+        value >>> 0;
+}
+
+function crc32(data) {
+    let crc =
+        0xFFFFFFFF;
+
+    for (
+        let i = 0;
+        i < data.length;
+        i++
+    ) {
+        crc =
+            CRC_TABLE[
+                (crc ^ data[i]) & 0xFF
+            ] ^
+            (crc >>> 8);
+    }
+
+    return (
+        crc ^
+        0xFFFFFFFF
+    ) >>> 0;
 }
 
 
@@ -1104,9 +1179,7 @@ if (downloadButton) {
             link.href = url;
             link.download = filename;
 
-            document.body.appendChild(
-                link
-            );
+            document.body.appendChild(link);
 
             link.click();
 
@@ -1114,9 +1187,7 @@ if (downloadButton) {
 
             setTimeout(
                 function() {
-                    URL.revokeObjectURL(
-                        url
-                    );
+                    URL.revokeObjectURL(url);
                 },
                 1000
             );
@@ -1126,239 +1197,109 @@ if (downloadButton) {
 
 
 /* =========================================================
-   ZIP
+   REMOVE ROM
 ========================================================= */
 
-function createStoredZip(files) {
-    const localParts = [];
-    const centralParts = [];
-
-    let offset = 0;
-
-    for (const file of files) {
-        const name =
-            new TextEncoder().encode(
-                file.name
-            );
-
-        const data =
-            file.data;
-
-        const checksum =
-            crc32(data);
-
-        const local =
-            concatBytes(
-                new Uint8Array([
-                    0x50,
-                    0x4B,
-                    0x03,
-                    0x04
-                ]),
-
-                uint16LE(20),
-                uint16LE(0),
-                uint16LE(0),
-                uint16LE(0),
-                uint16LE(0),
-
-                uint32LE(checksum),
-                uint32LE(data.length),
-                uint32LE(data.length),
-
-                uint16LE(name.length),
-                uint16LE(0),
-
-                name
-            );
-
-        localParts.push(
-            local,
-            data
-        );
-
-        const central =
-            concatBytes(
-                new Uint8Array([
-                    0x50,
-                    0x4B,
-                    0x01,
-                    0x02
-                ]),
-
-                uint16LE(20),
-                uint16LE(20),
-
-                uint16LE(0),
-                uint16LE(0),
-                uint16LE(0),
-                uint16LE(0),
-
-                uint32LE(checksum),
-                uint32LE(data.length),
-                uint32LE(data.length),
-
-                uint16LE(name.length),
-                uint16LE(0),
-                uint16LE(0),
-                uint16LE(0),
-                uint16LE(0),
-
-                uint32LE(0),
-                uint32LE(offset),
-
-                name
-            );
-
-        centralParts.push(
-            central
-        );
-
-        offset +=
-            local.length +
-            data.length;
-    }
-
-    const localData =
-        concatBytes(
-            ...localParts
-        );
-
-    const centralData =
-        concatBytes(
-            ...centralParts
-        );
-
-    const end =
-        concatBytes(
-            new Uint8Array([
-                0x50,
-                0x4B,
-                0x05,
-                0x06
-            ]),
-
-            uint16LE(0),
-            uint16LE(0),
-
-            uint16LE(files.length),
-            uint16LE(files.length),
-
-            uint32LE(
-                centralData.length
-            ),
-
-            uint32LE(
-                localData.length
-            ),
-
-            uint16LE(0)
-        );
-
-    return concatBytes(
-        localData,
-        centralData,
-        end
+if (removeRom) {
+    removeRom.addEventListener(
+        "click",
+        resetROM
     );
 }
 
+function resetROM() {
+    currentROM = null;
+    currentROMData = null;
+    currentROMInfo = null;
+    generatedSB3 = null;
+
+    if (romInput) {
+        romInput.value = "";
+    }
+
+    if (romInfo) {
+        romInfo.classList.add("hidden");
+    }
+
+    if (result) {
+        result.classList.add("hidden");
+    }
+
+    if (progressContainer) {
+        progressContainer.classList.add("hidden");
+    }
+
+    if (dropZone) {
+        dropZone.classList.remove("has-rom");
+    }
+
+    if (romStatus) {
+        romStatus.textContent =
+            "No ROM selected";
+    }
+
+    if (compileButton) {
+        compileButton.disabled = true;
+    }
+
+    setStatus(
+        "Select a Genesis ROM to begin."
+    );
+}
+
+function resetCompilation() {
+    generatedSB3 = null;
+
+    if (result) {
+        result.classList.add("hidden");
+    }
+
+    if (progressContainer) {
+        progressContainer.classList.add("hidden");
+    }
+}
+
 
 /* =========================================================
-   CRC32
+   PROGRESS
 ========================================================= */
 
-const CRC_TABLE =
-    new Uint32Array(256);
-
-for (
-    let i = 0;
-    i < 256;
-    i++
-) {
-    let c = i;
-
-    for (
-        let j = 0;
-        j < 8;
-        j++
-    ) {
-        c =
-            (c & 1)
-                ? 0xEDB88320 ^
-                    (c >>> 1)
-                : c >>> 1;
+function setProgress(percent, message) {
+    if (progressBar) {
+        progressBar.style.width =
+            `${percent}%`;
     }
 
-    CRC_TABLE[i] =
-        c >>> 0;
-}
-
-function crc32(data) {
-    let crc =
-        0xFFFFFFFF;
-
-    for (
-        let i = 0;
-        i < data.length;
-        i++
-    ) {
-        crc =
-            CRC_TABLE[
-                (crc ^ data[i]) & 0xFF
-            ] ^
-            (crc >>> 8);
+    if (progressPercent) {
+        progressPercent.textContent =
+            `${percent}%`;
     }
 
-    return (
-        crc ^
-        0xFFFFFFFF
-    ) >>> 0;
+    if (progressText) {
+        progressText.textContent =
+            message;
+    }
 }
 
 
 /* =========================================================
-   ZIP HELPERS
+   STATUS
 ========================================================= */
 
-function concatBytes(...arrays) {
-    let total = 0;
-
-    for (const array of arrays) {
-        total += array.length;
+function setStatus(message, type = "") {
+    if (!status) {
+        return;
     }
 
-    const output =
-        new Uint8Array(total);
+    status.textContent =
+        message;
 
-    let offset = 0;
+    status.className =
+        "status";
 
-    for (const array of arrays) {
-        output.set(
-            array,
-            offset
-        );
-
-        offset +=
-            array.length;
+    if (type) {
+        status.classList.add(type);
     }
-
-    return output;
-}
-
-function uint16LE(value) {
-    return new Uint8Array([
-        value & 0xFF,
-        (value >>> 8) & 0xFF
-    ]);
-}
-
-function uint32LE(value) {
-    return new Uint8Array([
-        value & 0xFF,
-        (value >>> 8) & 0xFF,
-        (value >>> 16) & 0xFF,
-        (value >>> 24) & 0xFF
-    ]);
 }
 
 
@@ -1369,10 +1310,7 @@ function uint32LE(value) {
 function delay(ms) {
     return new Promise(
         resolve =>
-            setTimeout(
-                resolve,
-                ms
-            )
+            setTimeout(resolve, ms)
     );
 }
 
@@ -1408,8 +1346,5 @@ window.Genesis2SB3 = {
 };
 
 console.log(
-    "Genesis2SB3 is ready."
-);
-console.log(
-    "Files are inspected as raw binary data."
+    "Genesis2SB3 v0.1.3 ready."
 );
