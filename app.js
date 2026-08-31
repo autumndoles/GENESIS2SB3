@@ -1970,6 +1970,7 @@ function concatBytes() {
 var arrays =
 Array.from(arguments);
 
+```
 var length = 0;
 
 for (
@@ -2001,12 +2002,14 @@ for (
 }
 
 return output;
+```
 
 }
 
 window.Genesis2SB3 = {
 version: VERSION,
 
+```
 getROM: function() {
     return currentROM;
 },
@@ -2028,6 +2031,7 @@ inspect: function() {
         currentROMData
     );
 }
+```
 
 };
 
