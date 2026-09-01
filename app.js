@@ -2,9 +2,10 @@ console.log("THE ONE PIECE IS REAL!!!-Whitebeard (Loaded)");
 
 let romData = null;
 let romFile = null;
+let generatedSB3 = null;
 
 // =========================================================
-// ROM LOADING
+// ELEMENTS
 // =========================================================
 
 const romInput = document.getElementById("romInput");
@@ -28,16 +29,36 @@ const result = document.getElementById("result");
 const resultText = document.getElementById("resultText");
 const downloadButton = document.getElementById("downloadButton");
 
-let generatedSB3 = null;
+// =========================================================
+// HELPERS
+// =========================================================
 
 function formatBytes(bytes) {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + " KB";
+    if (bytes < 1024) {
+        return bytes + " B";
+    }
+
+    if (bytes < 1024 * 1024) {
+        return (bytes / 1024).toFixed(2) + " KB";
+    }
+
     return (bytes / (1024 * 1024)).toFixed(2) + " MB";
 }
 
+function setProgress(percent, text) {
+    progressBar.style.width = percent + "%";
+    progressText.textContent = text;
+    progressPercent.textContent = percent + "%";
+}
+
+// =========================================================
+// ROM LOADING
+// =========================================================
+
 function loadROM(file) {
-    if (!file) return;
+    if (!file) {
+        return;
+    }
 
     romFile = file;
 
@@ -51,19 +72,26 @@ function loadROM(file) {
         romName.textContent = file.name;
         romSize.textContent = formatBytes(romData.length);
 
-        romStatus.textContent = "ROM loaded successfully. Ready to compile.";
+        romStatus.textContent =
+            "ROM loaded successfully. Ready to compile.";
 
         compileButton.disabled = false;
 
-        status.textContent = "ROM loaded successfully.";
+        status.textContent =
+            "ROM loaded successfully.";
     };
 
     reader.onerror = function() {
         romData = null;
         romFile = null;
 
-        romStatus.textContent = "Failed to read ROM.";
+        romStatus.textContent =
+            "Failed to read ROM.";
+
         compileButton.disabled = true;
+
+        status.textContent =
+            "Failed to read ROM.";
     };
 
     reader.readAsArrayBuffer(file);
@@ -75,8 +103,13 @@ romInput.addEventListener("change", function() {
     }
 });
 
+// =========================================================
+// DRAG AND DROP
+// =========================================================
+
 dropZone.addEventListener("dragover", function(event) {
     event.preventDefault();
+
     dropZone.classList.add("dragover");
 });
 
@@ -86,6 +119,7 @@ dropZone.addEventListener("dragleave", function() {
 
 dropZone.addEventListener("drop", function(event) {
     event.preventDefault();
+
     dropZone.classList.remove("dragover");
 
     const files = event.dataTransfer.files;
@@ -99,6 +133,10 @@ dropZone.addEventListener("click", function() {
     romInput.click();
 });
 
+// =========================================================
+// REMOVE ROM
+// =========================================================
+
 removeRom.addEventListener("click", function() {
     romData = null;
     romFile = null;
@@ -109,11 +147,17 @@ removeRom.addEventListener("click", function() {
 
     compileButton.disabled = true;
 
-    status.textContent = "ROM removed.";
+    result.style.display = "none";
+    downloadButton.style.display = "none";
+
+    generatedSB3 = null;
+
+    status.textContent =
+        "ROM removed.";
 });
 
 // =========================================================
-// KNOWN-GOOD PROJECT.JSON FROM v0.4.2
+// PROJECT.JSON
 // =========================================================
 
 function createProjectJSON() {
@@ -134,9 +178,14 @@ function createProjectJSON() {
 
                 costumes: [
                     {
-                        assetId: "ff3f2e0196df3c7d286c4c13e441b003",
+                        assetId:
+                            "ff3f2e0196df3c7d286c4c13e441b003",
+
                         name: "Backdrop",
-                        md5ext: "ff3f2e0196df3c7d286c4c13e441b003.svg",
+
+                        md5ext:
+                            "ff3f2e0196df3c7d286c4c13e441b003.svg",
+
                         dataFormat: "svg",
 
                         rotationCenterX: 240,
@@ -171,7 +220,7 @@ function createProjectJSON() {
 }
 
 // =========================================================
-// SVG BACKDROP
+// BACKDROP SVG
 // =========================================================
 
 function createBackdropSVG() {
@@ -213,14 +262,16 @@ function crc32(data) {
     let crc = 0xffffffff;
 
     for (let i = 0; i < data.length; i++) {
-        crc = crcTable[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
+        crc =
+            crcTable[(crc ^ data[i]) & 0xff] ^
+            (crc >>> 8);
     }
 
     return (crc ^ 0xffffffff) >>> 0;
 }
 
 // =========================================================
-// ZIP STORE WRITER
+// ZIP HELPERS
 // =========================================================
 
 function writeUInt16(arr, offset, value) {
@@ -239,6 +290,10 @@ function stringToBytes(str) {
     return new TextEncoder().encode(str);
 }
 
+// =========================================================
+// ZIP STORE WRITER
+// =========================================================
+
 function createZip(files) {
     const localParts = [];
     const centralParts = [];
@@ -252,51 +307,214 @@ function createZip(files) {
         const crc = crc32(data);
         const size = data.length;
 
-        const localHeader = new Uint8Array(30 + nameBytes.length);
+        // ---------------------------------------------
+        // LOCAL FILE HEADER
+        // ---------------------------------------------
 
-        writeUInt32(localHeader, 0, 0x04034b50);
-        writeUInt16(localHeader, 4, 20);
-        writeUInt16(localHeader, 6, 0);
-        writeUInt16(localHeader, 8, 0);
-        writeUInt16(localHeader, 10, 0);
-        writeUInt16(localHeader, 12, 0);
-        writeUInt32(localHeader, 14, crc);
-        writeUInt32(localHeader, 18, size);
-        writeUInt32(localHeader, 22, size);
-        writeUInt16(localHeader, 26, nameBytes.length);
-        writeUInt16(localHeader, 28, 0);
+        const localHeader =
+            new Uint8Array(30 + nameBytes.length);
 
-        localHeader.set(nameBytes, 30);
+        writeUInt32(
+            localHeader,
+            0,
+            0x04034b50
+        );
+
+        writeUInt16(
+            localHeader,
+            4,
+            20
+        );
+
+        writeUInt16(
+            localHeader,
+            6,
+            0
+        );
+
+        // Compression method: STORE
+        writeUInt16(
+            localHeader,
+            8,
+            0
+        );
+
+        // Time
+        writeUInt16(
+            localHeader,
+            10,
+            0
+        );
+
+        // Date
+        writeUInt16(
+            localHeader,
+            12,
+            0
+        );
+
+        writeUInt32(
+            localHeader,
+            14,
+            crc
+        );
+
+        writeUInt32(
+            localHeader,
+            18,
+            size
+        );
+
+        writeUInt32(
+            localHeader,
+            22,
+            size
+        );
+
+        writeUInt16(
+            localHeader,
+            26,
+            nameBytes.length
+        );
+
+        writeUInt16(
+            localHeader,
+            28,
+            0
+        );
+
+        localHeader.set(
+            nameBytes,
+            30
+        );
 
         localParts.push(localHeader);
         localParts.push(data);
 
-        const centralHeader = new Uint8Array(46 + nameBytes.length);
+        // ---------------------------------------------
+        // CENTRAL DIRECTORY ENTRY
+        // ---------------------------------------------
 
-        writeUInt32(centralHeader, 0, 0x02014b50);
-        writeUInt16(centralHeader, 4, 20);
-        writeUInt16(centralHeader, 6, 20);
-        writeUInt16(centralHeader, 8, 0);
-        writeUInt16(centralHeader, 10, 0);
-        writeUInt16(centralHeader, 12, 0);
-        writeUInt16(centralHeader, 14, 0);
-        writeUInt32(centralHeader, 16, crc);
-        writeUInt32(centralHeader, 20, size);
-        writeUInt32(centralHeader, 24, size);
-        writeUInt16(centralHeader, 28, nameBytes.length);
-        writeUInt16(centralHeader, 30, 0);
-        writeUInt16(centralHeader, 32, 0);
-        writeUInt16(centralHeader, 34, 0);
-        writeUInt16(centralHeader, 36, 0);
-        writeUInt32(centralHeader, 38, 0);
-        writeUInt32(centralHeader, 42, offset);
+        const centralHeader =
+            new Uint8Array(46 + nameBytes.length);
 
-        centralHeader.set(nameBytes, 46);
+        writeUInt32(
+            centralHeader,
+            0,
+            0x02014b50
+        );
+
+        writeUInt16(
+            centralHeader,
+            4,
+            20
+        );
+
+        writeUInt16(
+            centralHeader,
+            6,
+            20
+        );
+
+        writeUInt16(
+            centralHeader,
+            8,
+            0
+        );
+
+        writeUInt16(
+            centralHeader,
+            10,
+            0
+        );
+
+        writeUInt16(
+            centralHeader,
+            12,
+            0
+        );
+
+        writeUInt16(
+            centralHeader,
+            14,
+            0
+        );
+
+        writeUInt32(
+            centralHeader,
+            16,
+            crc
+        );
+
+        writeUInt32(
+            centralHeader,
+            20,
+            size
+        );
+
+        writeUInt32(
+            centralHeader,
+            24,
+            size
+        );
+
+        writeUInt16(
+            centralHeader,
+            28,
+            nameBytes.length
+        );
+
+        writeUInt16(
+            centralHeader,
+            30,
+            0
+        );
+
+        writeUInt16(
+            centralHeader,
+            32,
+            0
+        );
+
+        writeUInt16(
+            centralHeader,
+            34,
+            0
+        );
+
+        writeUInt16(
+            centralHeader,
+            36,
+            0
+        );
+
+        writeUInt32(
+            centralHeader,
+            38,
+            0
+        );
+
+        writeUInt32(
+            centralHeader,
+            42,
+            offset
+        );
+
+        centralHeader.set(
+            nameBytes,
+            46
+        );
 
         centralParts.push(centralHeader);
 
-        offset += localHeader.length + data.length;
+        offset +=
+            localHeader.length +
+            data.length;
     }
+
+    // =====================================================
+    // CENTRAL DIRECTORY
+    // =====================================================
 
     let centralSize = 0;
 
@@ -306,37 +524,101 @@ function createZip(files) {
 
     const centralOffset = offset;
 
-    const end = new Uint8Array(22);
+    // =====================================================
+    // END OF CENTRAL DIRECTORY
+    // =====================================================
 
-    writeUInt32(end, 0, 0x06054b50);
-    writeUInt16(end, 4, 0);
-    writeUInt16(end, 6, 0);
-    writeUInt16(end, 8, files.length);
-    writeUInt16(end, 10, files.length);
-    writeUInt32(end, 12, centralSize);
-    writeUInt32(end, 16, centralOffset);
-    writeUInt16(end, 20, 0);
+    const end =
+        new Uint8Array(22);
+
+    writeUInt32(
+        end,
+        0,
+        0x06054b50
+    );
+
+    writeUInt16(
+        end,
+        4,
+        0
+    );
+
+    writeUInt16(
+        end,
+        6,
+        0
+    );
+
+    writeUInt16(
+        end,
+        8,
+        files.length
+    );
+
+    writeUInt16(
+        end,
+        10,
+        files.length
+    );
+
+    writeUInt32(
+        end,
+        12,
+        centralSize
+    );
+
+    writeUInt32(
+        end,
+        16,
+        centralOffset
+    );
+
+    writeUInt16(
+        end,
+        20,
+        0
+    );
+
+    // =====================================================
+    // BUILD FINAL ZIP
+    // =====================================================
 
     const totalSize =
-        localParts.reduce((sum, part) => sum + part.length, 0) +
+        localParts.reduce(
+            (sum, part) =>
+                sum + part.length,
+            0
+        ) +
         centralSize +
         end.length;
 
-    const output = new Uint8Array(totalSize);
+    const output =
+        new Uint8Array(totalSize);
 
     let position = 0;
 
     for (const part of localParts) {
-        output.set(part, position);
+        output.set(
+            part,
+            position
+        );
+
         position += part.length;
     }
 
     for (const part of centralParts) {
-        output.set(part, position);
+        output.set(
+            part,
+            position
+        );
+
         position += part.length;
     }
 
-    output.set(end, position);
+    output.set(
+        end,
+        position
+    );
 
     return output;
 }
@@ -345,112 +627,203 @@ function createZip(files) {
 // COMPILER
 // =========================================================
 
-compileButton.addEventListener("click", async function() {
-    if (!romData) {
-        status.textContent = "Please load a ROM first.";
-        return;
-    }
+compileButton.addEventListener(
+    "click",
+    async function() {
 
-    compileButton.disabled = true;
+        if (!romData) {
+            status.textContent =
+                "Please load a ROM first.";
 
-    progressContainer.style.display = "block";
-    result.style.display = "none";
-
-    progressBar.style.width = "10%";
-    progressText.textContent = "Preparing project...";
-    progressPercent.textContent = "10%";
-
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    progressBar.style.width = "35%";
-    progressText.textContent = "Creating project.json...";
-    progressPercent.textContent = "35%";
-
-    const projectJSON = JSON.stringify(createProjectJSON());
-
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    progressBar.style.width = "60%";
-    progressText.textContent = "Adding ROM...";
-    progressPercent.textContent = "60%";
-
-    /*
-     * IMPORTANT:
-     *
-     * The ROM is deliberately NOT referenced by project.json.
-     *
-     * This is a packaging experiment to see whether
-     * Scratch/TurboWarp accepts an additional file inside
-     * the SB3 ZIP.
-     */
-
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    progressBar.style.width = "80%";
-    progressText.textContent = "Building SB3...";
-    progressPercent.textContent = "80%";
-
-    const files = [
-        {
-            name: "project.json",
-            data: stringToBytes(projectJSON)
-        },
-
-        {
-            name: "ff3f2e0196df3c7d286c4c13e441b003.svg",
-            data: stringToBytes(createBackdropSVG())
-        },
-
-        {
-            name: "genesis.rom",
-            data: romData
+            return;
         }
-    ];
 
-    const zipData = createZip(files);
+        compileButton.disabled = true;
 
-    generatedSB3 = new Blob(
-        [zipData],
-        { type: "application/x.scratch.sb3" }
-    );
+        progressContainer.style.display =
+            "block";
 
-    await new Promise(resolve => setTimeout(resolve, 100));
+        result.style.display =
+            "none";
 
-    progressBar.style.width = "100%";
-    progressText.textContent = "Compilation complete!";
-    progressPercent.textContent = "100%";
+        downloadButton.style.display =
+            "none";
 
-    status.textContent =
-        "v0.5 ROM packaging test complete. ROM included as genesis.rom.";
+        setProgress(
+            10,
+            "Preparing project..."
+        );
 
-    resultText.textContent =
-        "SB3 created successfully. " +
-        "The ROM was included inside the SB3 as genesis.rom.";
+        await new Promise(
+            resolve =>
+                setTimeout(resolve, 100)
+        );
 
-    result.style.display = "block";
+        // ---------------------------------------------
+        // PROJECT JSON
+        // ---------------------------------------------
 
-    compileButton.disabled = false;
-});
+        setProgress(
+            35,
+            "Creating project.json..."
+        );
+
+        const projectJSON =
+            JSON.stringify(
+                createProjectJSON()
+            );
+
+        await new Promise(
+            resolve =>
+                setTimeout(resolve, 100)
+        );
+
+        // ---------------------------------------------
+        // ROM
+        // ---------------------------------------------
+
+        setProgress(
+            60,
+            "Adding ROM..."
+        );
+
+        /*
+         * The ROM is deliberately NOT referenced
+         * by project.json yet.
+         *
+         * This version only tests whether an SB3
+         * can contain the ROM as an extra file.
+         */
+
+        await new Promise(
+            resolve =>
+                setTimeout(resolve, 100)
+        );
+
+        // ---------------------------------------------
+        // BUILD ZIP
+        // ---------------------------------------------
+
+        setProgress(
+            80,
+            "Building SB3..."
+        );
+
+        const files = [
+            {
+                name: "project.json",
+
+                data:
+                    stringToBytes(
+                        projectJSON
+                    )
+            },
+
+            {
+                name:
+                    "ff3f2e0196df3c7d286c4c13e441b003.svg",
+
+                data:
+                    stringToBytes(
+                        createBackdropSVG()
+                    )
+            },
+
+            {
+                name: "genesis.rom",
+
+                data: romData
+            }
+        ];
+
+        const zipData =
+            createZip(files);
+
+        generatedSB3 =
+            new Blob(
+                [zipData],
+                {
+                    type:
+                        "application/x.scratch.sb3"
+                }
+            );
+
+        await new Promise(
+            resolve =>
+                setTimeout(resolve, 100)
+        );
+
+        // ---------------------------------------------
+        // COMPLETE
+        // ---------------------------------------------
+
+        setProgress(
+            100,
+            "Compilation complete!"
+        );
+
+        status.textContent =
+            "v0.5 ROM packaging test complete.";
+
+        resultText.textContent =
+            "SB3 created successfully. " +
+            "The ROM was included inside the SB3 " +
+            "as genesis.rom.";
+
+        result.style.display =
+            "block";
+
+        // THIS IS THE IMPORTANT FIX
+        downloadButton.style.display =
+            "inline-block";
+
+        downloadButton.disabled =
+            false;
+
+        compileButton.disabled =
+            false;
+    }
+);
 
 // =========================================================
 // DOWNLOAD
 // =========================================================
 
-downloadButton.addEventListener("click", function() {
-    if (!generatedSB3) return;
+downloadButton.addEventListener(
+    "click",
+    function() {
 
-    const url = URL.createObjectURL(generatedSB3);
+        if (!generatedSB3) {
+            status.textContent =
+                "No SB3 file has been generated yet.";
 
-    const a = document.createElement("a");
+            return;
+        }
 
-    a.href = url;
-    a.download = "Genesis2SB3-v0.5-rom-test.sb3";
+        const url =
+            URL.createObjectURL(
+                generatedSB3
+            );
 
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+        const a =
+            document.createElement("a");
 
-    setTimeout(() => {
-        URL.revokeObjectURL(url);
-    }, 1000);
-});
+        a.href = url;
+
+        a.download =
+            "Genesis2SB3-v0.5-rom-test.sb3";
+
+        document.body.appendChild(a);
+
+        a.click();
+
+        a.remove();
+
+        setTimeout(
+            function() {
+                URL.revokeObjectURL(url);
+            },
+            1000
+        );
+    }
+);
