@@ -1,176 +1,145 @@
 console.log("THE ONE PIECE IS REAL!!!-Whitebeard (Loaded)");
 
-var romInput = document.getElementById("romInput");
-var dropZone = document.getElementById("dropZone");
-var romInfo = document.getElementById("romInfo");
-var romName = document.getElementById("romName");
-var romSize = document.getElementById("romSize");
-var romStatus = document.getElementById("romStatus");
-var removeRom = document.getElementById("removeRom");
-var compileButton = document.getElementById("compileButton");
-var progressContainer = document.getElementById("progressContainer");
-var progressBar = document.getElementById("progressBar");
-var progressText = document.getElementById("progressText");
-var progressPercent = document.getElementById("progressPercent");
-var statusBox = document.getElementById("status");
-var result = document.getElementById("result");
-var resultText = document.getElementById("resultText");
-var downloadButton = document.getElementById("downloadButton");
+let romData = null;
+let romFile = null;
 
-var currentROM = null;
-var currentROMData = null;
-var generatedSB3 = null;
+// =========================================================
+// ROM LOADING
+// =========================================================
 
-function setStatus(message) {
-    if (statusBox) {
-        statusBox.textContent = message;
-    }
+const romInput = document.getElementById("romInput");
+const dropZone = document.getElementById("dropZone");
 
-    console.log(message);
-}
+const romInfo = document.getElementById("romInfo");
+const romName = document.getElementById("romName");
+const romSize = document.getElementById("romSize");
+const romStatus = document.getElementById("romStatus");
+const removeRom = document.getElementById("removeRom");
 
-function setProgress(percent, message) {
-    if (progressBar) {
-        progressBar.style.width = percent + "%";
-    }
+const compileButton = document.getElementById("compileButton");
 
-    if (progressPercent) {
-        progressPercent.textContent = Math.round(percent) + "%";
-    }
+const progressContainer = document.getElementById("progressContainer");
+const progressBar = document.getElementById("progressBar");
+const progressText = document.getElementById("progressText");
+const progressPercent = document.getElementById("progressPercent");
 
-    if (progressText) {
-        progressText.textContent = message;
-    }
-}
+const status = document.getElementById("status");
+const result = document.getElementById("result");
+const resultText = document.getElementById("resultText");
+const downloadButton = document.getElementById("downloadButton");
+
+let generatedSB3 = null;
 
 function formatBytes(bytes) {
-    if (bytes < 1024) {
-        return bytes + " B";
-    }
-
-    if (bytes < 1024 * 1024) {
-        return (bytes / 1024).toFixed(2) + " KB";
-    }
-
-    return (bytes / 1024 / 1024).toFixed(2) + " MB";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
 }
 
-
-/* =========================================================
-   ROM LOADING
-========================================================= */
-
 function loadROM(file) {
-    if (!file) {
-        return;
-    }
+    if (!file) return;
 
-    var filename = file.name.toLowerCase();
+    romFile = file;
 
-    var valid =
-        filename.endsWith(".md") ||
-        filename.endsWith(".bin") ||
-        filename.endsWith(".gen") ||
-        filename.endsWith(".smd");
-
-    if (!valid) {
-        setStatus(
-            "Unsupported ROM. Use .MD, .BIN, .GEN, or .SMD."
-        );
-        return;
-    }
-
-    setStatus("Reading ROM...");
-
-    var reader = new FileReader();
+    const reader = new FileReader();
 
     reader.onload = function(event) {
-        currentROM = file;
-        currentROMData = new Uint8Array(
-            event.target.result
-        );
+        romData = new Uint8Array(event.target.result);
 
-        if (romName) {
-            romName.textContent = file.name;
-        }
+        romInfo.style.display = "block";
 
-        if (romSize) {
-            romSize.textContent =
-                formatBytes(currentROMData.length);
-        }
+        romName.textContent = file.name;
+        romSize.textContent = formatBytes(romData.length);
 
-        if (romStatus) {
-            romStatus.textContent = "ROM detected";
-        }
+        romStatus.textContent = "ROM loaded successfully. Ready to compile.";
 
-        if (romInfo) {
-            romInfo.classList.remove("hidden");
-        }
+        compileButton.disabled = false;
 
-        if (compileButton) {
-            compileButton.disabled = false;
-        }
-
-        setStatus(
-            "ROM detected: " +
-            file.name +
-            " (" +
-            formatBytes(currentROMData.length) +
-            ")"
-        );
-
-        console.log(
-            "ROM loaded successfully:",
-            currentROMData.length,
-            "bytes"
-        );
+        status.textContent = "ROM loaded successfully.";
     };
 
     reader.onerror = function() {
-        setStatus("Failed to read ROM.");
+        romData = null;
+        romFile = null;
+
+        romStatus.textContent = "Failed to read ROM.";
+        compileButton.disabled = true;
     };
 
     reader.readAsArrayBuffer(file);
 }
 
+romInput.addEventListener("change", function() {
+    if (romInput.files.length > 0) {
+        loadROM(romInput.files[0]);
+    }
+});
 
-/* =========================================================
-   MINIMAL VALID SCRATCH PROJECT
-========================================================= */
+dropZone.addEventListener("dragover", function(event) {
+    event.preventDefault();
+    dropZone.classList.add("dragover");
+});
+
+dropZone.addEventListener("dragleave", function() {
+    dropZone.classList.remove("dragover");
+});
+
+dropZone.addEventListener("drop", function(event) {
+    event.preventDefault();
+    dropZone.classList.remove("dragover");
+
+    const files = event.dataTransfer.files;
+
+    if (files.length > 0) {
+        loadROM(files[0]);
+    }
+});
+
+dropZone.addEventListener("click", function() {
+    romInput.click();
+});
+
+removeRom.addEventListener("click", function() {
+    romData = null;
+    romFile = null;
+
+    romInput.value = "";
+
+    romInfo.style.display = "none";
+
+    compileButton.disabled = true;
+
+    status.textContent = "ROM removed.";
+});
+
+// =========================================================
+// KNOWN-GOOD PROJECT.JSON FROM v0.4.2
+// =========================================================
 
 function createProjectJSON() {
-    return JSON.stringify({
+    return {
         targets: [
             {
                 isStage: true,
                 name: "Stage",
 
                 variables: {},
-
                 lists: {},
-
                 broadcasts: {},
 
                 blocks: {},
-
                 comments: {},
 
                 currentCostume: 0,
 
                 costumes: [
                     {
-                        assetId:
-                            "ff3f2e0196df3c7d286c4c13e441b003",
-
-                        name: "backdrop1",
-
-                        md5ext:
-                            "ff3f2e0196df3c7d286c4c13e441b003.svg",
-
+                        assetId: "ff3f2e0196df3c7d286c4c13e441b003",
+                        name: "Backdrop",
+                        md5ext: "ff3f2e0196df3c7d286c4c13e441b003.svg",
                         dataFormat: "svg",
 
                         rotationCenterX: 240,
-
                         rotationCenterY: 180
                     }
                 ],
@@ -178,14 +147,12 @@ function createProjectJSON() {
                 sounds: [],
 
                 volume: 100,
-
                 layerOrder: 0,
 
                 tempo: 60,
 
                 videoTransparency: 50,
-
-                videoState: "on",
+                videoState: "off",
 
                 textToSpeechLanguage: null
             }
@@ -197,593 +164,293 @@ function createProjectJSON() {
 
         meta: {
             semver: "3.0.0",
-
-            vm: "0.2.0",
-
-            agent: "Genesis2SB3 v0.4.2"
+            vm: "11.3.0",
+            agent: "Genesis2SB3 v0.5"
         }
-    });
+    };
 }
 
-
-/* =========================================================
-   SVG BACKDROP
-========================================================= */
+// =========================================================
+// SVG BACKDROP
+// =========================================================
 
 function createBackdropSVG() {
-    var svg =
-        '<svg xmlns="http://www.w3.org/2000/svg" ' +
-        'width="480" height="360" ' +
-        'viewBox="0 0 480 360">' +
-        '<rect width="480" height="360" fill="#ffffff"/>' +
-        '</svg>';
-
-    return new TextEncoder().encode(svg);
+    return `<svg xmlns="http://www.w3.org/2000/svg"
+width="480"
+height="360"
+viewBox="0 0 480 360">
+<rect width="480" height="360" fill="#ffffff"/>
+</svg>`;
 }
 
+// =========================================================
+// CRC32
+// =========================================================
 
-/* =========================================================
-   CRC32
-========================================================= */
+function makeCRC32Table() {
+    const table = new Uint32Array(256);
 
-function crc32(data) {
-    var table = [];
+    for (let n = 0; n < 256; n++) {
+        let c = n;
 
-    for (var i = 0; i < 256; i++) {
-        var c = i;
-
-        for (var j = 0; j < 8; j++) {
+        for (let k = 0; k < 8; k++) {
             if (c & 1) {
-                c =
-                    0xEDB88320 ^
-                    (c >>> 1);
+                c = 0xedb88320 ^ (c >>> 1);
             } else {
-                c = c >>> 1;
+                c >>>= 1;
             }
         }
 
-        table[i] = c >>> 0;
+        table[n] = c >>> 0;
     }
 
-    var crc = 0xFFFFFFFF;
-
-    for (var k = 0; k < data.length; k++) {
-        crc =
-            table[
-                (crc ^ data[k]) & 0xFF
-            ] ^
-            (crc >>> 8);
-    }
-
-    return (
-        crc ^ 0xFFFFFFFF
-    ) >>> 0;
+    return table;
 }
 
+const crcTable = makeCRC32Table();
 
-/* =========================================================
-   BINARY HELPERS
-========================================================= */
+function crc32(data) {
+    let crc = 0xffffffff;
 
-function u16(value) {
-    return new Uint8Array([
-        value & 255,
-        (value >>> 8) & 255
-    ]);
-}
-
-function u32(value) {
-    return new Uint8Array([
-        value & 255,
-        (value >>> 8) & 255,
-        (value >>> 16) & 255,
-        (value >>> 24) & 255
-    ]);
-}
-
-function join(parts) {
-    var total = 0;
-
-    for (var i = 0; i < parts.length; i++) {
-        total += parts[i].length;
+    for (let i = 0; i < data.length; i++) {
+        crc = crcTable[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
     }
 
-    var output = new Uint8Array(total);
+    return (crc ^ 0xffffffff) >>> 0;
+}
 
-    var position = 0;
+// =========================================================
+// ZIP STORE WRITER
+// =========================================================
 
-    for (var j = 0; j < parts.length; j++) {
-        output.set(
-            parts[j],
-            position
-        );
+function writeUInt16(arr, offset, value) {
+    arr[offset] = value & 0xff;
+    arr[offset + 1] = (value >>> 8) & 0xff;
+}
 
-        position += parts[j].length;
+function writeUInt32(arr, offset, value) {
+    arr[offset] = value & 0xff;
+    arr[offset + 1] = (value >>> 8) & 0xff;
+    arr[offset + 2] = (value >>> 16) & 0xff;
+    arr[offset + 3] = (value >>> 24) & 0xff;
+}
+
+function stringToBytes(str) {
+    return new TextEncoder().encode(str);
+}
+
+function createZip(files) {
+    const localParts = [];
+    const centralParts = [];
+
+    let offset = 0;
+
+    for (const file of files) {
+        const nameBytes = stringToBytes(file.name);
+        const data = file.data;
+
+        const crc = crc32(data);
+        const size = data.length;
+
+        const localHeader = new Uint8Array(30 + nameBytes.length);
+
+        writeUInt32(localHeader, 0, 0x04034b50);
+        writeUInt16(localHeader, 4, 20);
+        writeUInt16(localHeader, 6, 0);
+        writeUInt16(localHeader, 8, 0);
+        writeUInt16(localHeader, 10, 0);
+        writeUInt16(localHeader, 12, 0);
+        writeUInt32(localHeader, 14, crc);
+        writeUInt32(localHeader, 18, size);
+        writeUInt32(localHeader, 22, size);
+        writeUInt16(localHeader, 26, nameBytes.length);
+        writeUInt16(localHeader, 28, 0);
+
+        localHeader.set(nameBytes, 30);
+
+        localParts.push(localHeader);
+        localParts.push(data);
+
+        const centralHeader = new Uint8Array(46 + nameBytes.length);
+
+        writeUInt32(centralHeader, 0, 0x02014b50);
+        writeUInt16(centralHeader, 4, 20);
+        writeUInt16(centralHeader, 6, 20);
+        writeUInt16(centralHeader, 8, 0);
+        writeUInt16(centralHeader, 10, 0);
+        writeUInt16(centralHeader, 12, 0);
+        writeUInt16(centralHeader, 14, 0);
+        writeUInt32(centralHeader, 16, crc);
+        writeUInt32(centralHeader, 20, size);
+        writeUInt32(centralHeader, 24, size);
+        writeUInt16(centralHeader, 28, nameBytes.length);
+        writeUInt16(centralHeader, 30, 0);
+        writeUInt16(centralHeader, 32, 0);
+        writeUInt16(centralHeader, 34, 0);
+        writeUInt16(centralHeader, 36, 0);
+        writeUInt32(centralHeader, 38, 0);
+        writeUInt32(centralHeader, 42, offset);
+
+        centralHeader.set(nameBytes, 46);
+
+        centralParts.push(centralHeader);
+
+        offset += localHeader.length + data.length;
     }
+
+    let centralSize = 0;
+
+    for (const part of centralParts) {
+        centralSize += part.length;
+    }
+
+    const centralOffset = offset;
+
+    const end = new Uint8Array(22);
+
+    writeUInt32(end, 0, 0x06054b50);
+    writeUInt16(end, 4, 0);
+    writeUInt16(end, 6, 0);
+    writeUInt16(end, 8, files.length);
+    writeUInt16(end, 10, files.length);
+    writeUInt32(end, 12, centralSize);
+    writeUInt32(end, 16, centralOffset);
+    writeUInt16(end, 20, 0);
+
+    const totalSize =
+        localParts.reduce((sum, part) => sum + part.length, 0) +
+        centralSize +
+        end.length;
+
+    const output = new Uint8Array(totalSize);
+
+    let position = 0;
+
+    for (const part of localParts) {
+        output.set(part, position);
+        position += part.length;
+    }
+
+    for (const part of centralParts) {
+        output.set(part, position);
+        position += part.length;
+    }
+
+    output.set(end, position);
 
     return output;
 }
 
+// =========================================================
+// COMPILER
+// =========================================================
 
-/* =========================================================
-   ZIP STORE WRITER
-========================================================= */
-
-function createZip(files) {
-    var localFiles = [];
-    var centralFiles = [];
-
-    var offset = 0;
-
-    var encoder = new TextEncoder();
-
-    for (var i = 0; i < files.length; i++) {
-        var file = files[i];
-
-        var nameBytes =
-            encoder.encode(file.name);
-
-        var data = file.data;
-
-        var crc = crc32(data);
-
-        var localHeader = join([
-            new Uint8Array([
-                0x50,
-                0x4B,
-                0x03,
-                0x04
-            ]),
-
-            u16(20),
-
-            u16(0),
-
-            u16(0),
-
-            u16(0),
-
-            u16(0),
-
-            u32(crc),
-
-            u32(data.length),
-
-            u32(data.length),
-
-            u16(nameBytes.length),
-
-            u16(0),
-
-            nameBytes
-        ]);
-
-        var localFile = join([
-            localHeader,
-            data
-        ]);
-
-        localFiles.push(localFile);
-
-
-        var centralHeader = join([
-            new Uint8Array([
-                0x50,
-                0x4B,
-                0x01,
-                0x02
-            ]),
-
-            u16(20),
-
-            u16(20),
-
-            u16(0),
-
-            u16(0),
-
-            u16(0),
-
-            u16(0),
-
-            u32(crc),
-
-            u32(data.length),
-
-            u32(data.length),
-
-            u16(nameBytes.length),
-
-            u16(0),
-
-            u16(0),
-
-            u16(0),
-
-            u16(0),
-
-            u32(0),
-
-            u32(offset),
-
-            nameBytes
-        ]);
-
-        centralFiles.push(
-            centralHeader
-        );
-
-        offset += localFile.length;
+compileButton.addEventListener("click", async function() {
+    if (!romData) {
+        status.textContent = "Please load a ROM first.";
+        return;
     }
 
-    var localData = join(localFiles);
+    compileButton.disabled = true;
 
-    var centralData = join(
-        centralFiles
-    );
+    progressContainer.style.display = "block";
+    result.style.display = "none";
 
-    var endRecord = join([
-        new Uint8Array([
-            0x50,
-            0x4B,
-            0x05,
-            0x06
-        ]),
+    progressBar.style.width = "10%";
+    progressText.textContent = "Preparing project...";
+    progressPercent.textContent = "10%";
 
-        u16(0),
+    await new Promise(resolve => setTimeout(resolve, 100));
 
-        u16(0),
+    progressBar.style.width = "35%";
+    progressText.textContent = "Creating project.json...";
+    progressPercent.textContent = "35%";
 
-        u16(files.length),
+    const projectJSON = JSON.stringify(createProjectJSON());
 
-        u16(files.length),
+    await new Promise(resolve => setTimeout(resolve, 100));
 
-        u32(centralData.length),
+    progressBar.style.width = "60%";
+    progressText.textContent = "Adding ROM...";
+    progressPercent.textContent = "60%";
 
-        u32(localData.length),
+    /*
+     * IMPORTANT:
+     *
+     * The ROM is deliberately NOT referenced by project.json.
+     *
+     * This is a packaging experiment to see whether
+     * Scratch/TurboWarp accepts an additional file inside
+     * the SB3 ZIP.
+     */
 
-        u16(0)
-    ]);
+    await new Promise(resolve => setTimeout(resolve, 100));
 
-    return join([
-        localData,
-        centralData,
-        endRecord
-    ]);
-}
+    progressBar.style.width = "80%";
+    progressText.textContent = "Building SB3...";
+    progressPercent.textContent = "80%";
 
-
-/* =========================================================
-   GENERATE TEST SB3
-========================================================= */
-
-function createTestSB3() {
-    setProgress(
-        20,
-        "Creating project.json..."
-    );
-
-    var projectJSON =
-        createProjectJSON();
-
-    var projectData =
-        new TextEncoder().encode(
-            projectJSON
-        );
-
-    setProgress(
-        45,
-        "Creating backdrop..."
-    );
-
-    var backdropData =
-        createBackdropSVG();
-
-    setProgress(
-        65,
-        "Building SB3 ZIP..."
-    );
-
-    var zipData = createZip([
+    const files = [
         {
             name: "project.json",
-            data: projectData
+            data: stringToBytes(projectJSON)
         },
 
         {
-            name:
-                "ff3f2e0196df3c7d286c4c13e441b003.svg",
+            name: "ff3f2e0196df3c7d286c4c13e441b003.svg",
+            data: stringToBytes(createBackdropSVG())
+        },
 
-            data: backdropData
+        {
+            name: "genesis.rom",
+            data: romData
         }
-    ]);
+    ];
 
-    setProgress(
-        90,
-        "Finalizing SB3..."
-    );
+    const zipData = createZip(files);
 
-    return new Blob(
+    generatedSB3 = new Blob(
         [zipData],
-        {
-            type:
-                "application/x.scratch.sb3"
-        }
-    );
-}
-
-
-/* =========================================================
-   TEST COMPILER
-========================================================= */
-
-function compileTestProject() {
-    if (!currentROMData) {
-        setStatus(
-            "Select a ROM first."
-        );
-
-        return;
-    }
-
-    if (progressContainer) {
-        progressContainer.classList.remove(
-            "hidden"
-        );
-    }
-
-    if (result) {
-        result.classList.add(
-            "hidden"
-        );
-    }
-
-    if (compileButton) {
-        compileButton.disabled = true;
-    }
-
-    try {
-        setProgress(
-            0,
-            "Starting v0.4.2 SB3 test..."
-        );
-
-        generatedSB3 =
-            createTestSB3();
-
-        setProgress(
-            100,
-            "SB3 test created!"
-        );
-
-        setStatus(
-            "v0.4.2 test SB3 generated successfully."
-        );
-
-        if (resultText) {
-            resultText.textContent =
-                "TEST ONLY: This SB3 contains a minimal Scratch project and one backdrop. The Genesis ROM is NOT included.";
-        }
-
-        if (result) {
-            result.classList.remove(
-                "hidden"
-            );
-        }
-
-        console.log(
-            "================================"
-        );
-
-        console.log(
-            "Genesis2SB3 v0.4.2 TEST"
-        );
-
-        console.log(
-            "SB3 generated:",
-            generatedSB3.size,
-            "bytes"
-        );
-
-        console.log(
-            "Contents:"
-        );
-
-        console.log(
-            " - project.json"
-        );
-
-        console.log(
-            " - backdrop SVG"
-        );
-
-        console.log(
-            "ROM intentionally excluded."
-        );
-
-        console.log(
-            "================================"
-        );
-
-    } catch (error) {
-        console.error(
-            "SB3 generation failed:",
-            error
-        );
-
-        setStatus(
-            "SB3 generation failed: " +
-            error.message
-        );
-    }
-
-    if (compileButton) {
-        compileButton.disabled = false;
-    }
-}
-
-
-/* =========================================================
-   DOWNLOAD
-========================================================= */
-
-function downloadSB3() {
-    if (!generatedSB3) {
-        setStatus(
-            "Generate the test SB3 first."
-        );
-
-        return;
-    }
-
-    var url =
-        URL.createObjectURL(
-            generatedSB3
-        );
-
-    var link =
-        document.createElement("a");
-
-    link.href = url;
-
-    link.download =
-        "Genesis2SB3-v0.4.2-test.sb3";
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    document.body.removeChild(link);
-
-    setTimeout(
-        function() {
-            URL.revokeObjectURL(url);
-        },
-        1000
-    );
-}
-
-
-/* =========================================================
-   UI EVENTS
-========================================================= */
-
-if (romInput) {
-    romInput.addEventListener(
-        "change",
-        function(event) {
-            if (
-                event.target.files &&
-                event.target.files.length > 0
-            ) {
-                loadROM(
-                    event.target.files[0]
-                );
-            }
-        }
-    );
-}
-
-if (dropZone) {
-    dropZone.addEventListener(
-        "dragover",
-        function(event) {
-            event.preventDefault();
-
-            dropZone.classList.add(
-                "dragging"
-            );
-        }
+        { type: "application/x.scratch.sb3" }
     );
 
-    dropZone.addEventListener(
-        "dragleave",
-        function() {
-            dropZone.classList.remove(
-                "dragging"
-            );
-        }
-    );
+    await new Promise(resolve => setTimeout(resolve, 100));
 
-    dropZone.addEventListener(
-        "drop",
-        function(event) {
-            event.preventDefault();
+    progressBar.style.width = "100%";
+    progressText.textContent = "Compilation complete!";
+    progressPercent.textContent = "100%";
 
-            dropZone.classList.remove(
-                "dragging"
-            );
+    status.textContent =
+        "v0.5 ROM packaging test complete. ROM included as genesis.rom.";
 
-            if (
-                event.dataTransfer.files &&
-                event.dataTransfer.files.length > 0
-            ) {
-                loadROM(
-                    event.dataTransfer.files[0]
-                );
-            }
-        }
-    );
-}
+    resultText.textContent =
+        "SB3 created successfully. " +
+        "The ROM was included inside the SB3 as genesis.rom.";
 
-if (removeRom) {
-    removeRom.addEventListener(
-        "click",
-        function() {
-            currentROM = null;
-            currentROMData = null;
-            generatedSB3 = null;
+    result.style.display = "block";
 
-            if (romInput) {
-                romInput.value = "";
-            }
+    compileButton.disabled = false;
+});
 
-            if (romInfo) {
-                romInfo.classList.add(
-                    "hidden"
-                );
-            }
+// =========================================================
+// DOWNLOAD
+// =========================================================
 
-            if (result) {
-                result.classList.add(
-                    "hidden"
-                );
-            }
+downloadButton.addEventListener("click", function() {
+    if (!generatedSB3) return;
 
-            if (romStatus) {
-                romStatus.textContent =
-                    "No ROM selected";
-            }
+    const url = URL.createObjectURL(generatedSB3);
 
-            if (compileButton) {
-                compileButton.disabled = true;
-            }
+    const a = document.createElement("a");
 
-            setStatus(
-                "Select a Genesis ROM to begin."
-            );
-        }
-    );
-}
+    a.href = url;
+    a.download = "Genesis2SB3-v0.5-rom-test.sb3";
 
-if (compileButton) {
-    compileButton.addEventListener(
-        "click",
-        compileTestProject
-    );
-}
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
 
-if (downloadButton) {
-    downloadButton.addEventListener(
-        "click",
-        downloadSB3
-    );
-}
-
-setStatus(
-    "Select a Genesis ROM to begin."
-);
-
-console.log(
-    "Genesis2SB3 v0.4.2 ready."
-);
+    setTimeout(() => {
+        URL.revokeObjectURL(url);
+    }, 1000);
+});
