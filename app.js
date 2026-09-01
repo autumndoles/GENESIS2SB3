@@ -8,11 +8,11 @@ var romSize = document.getElementById("romSize");
 var romStatus = document.getElementById("romStatus");
 var removeRom = document.getElementById("removeRom");
 var compileButton = document.getElementById("compileButton");
-var statusBox = document.getElementById("status");
 var progressContainer = document.getElementById("progressContainer");
 var progressBar = document.getElementById("progressBar");
 var progressText = document.getElementById("progressText");
 var progressPercent = document.getElementById("progressPercent");
+var statusBox = document.getElementById("status");
 var result = document.getElementById("result");
 var resultText = document.getElementById("resultText");
 var downloadButton = document.getElementById("downloadButton");
@@ -35,8 +35,7 @@ function setProgress(percent, message) {
     }
 
     if (progressPercent) {
-        progressPercent.textContent =
-            Math.round(percent) + "%";
+        progressPercent.textContent = Math.round(percent) + "%";
     }
 
     if (progressText) {
@@ -55,6 +54,11 @@ function formatBytes(bytes) {
 
     return (bytes / 1024 / 1024).toFixed(2) + " MB";
 }
+
+
+/* =========================================================
+   ROM LOADING
+========================================================= */
 
 function loadROM(file) {
     if (!file) {
@@ -82,8 +86,9 @@ function loadROM(file) {
 
     reader.onload = function(event) {
         currentROM = file;
-        currentROMData =
-            new Uint8Array(event.target.result);
+        currentROMData = new Uint8Array(
+            event.target.result
+        );
 
         if (romName) {
             romName.textContent = file.name;
@@ -128,37 +133,98 @@ function loadROM(file) {
     reader.readAsArrayBuffer(file);
 }
 
+
+/* =========================================================
+   MINIMAL VALID SCRATCH PROJECT
+========================================================= */
+
 function createProjectJSON() {
     return JSON.stringify({
         targets: [
             {
                 isStage: true,
                 name: "Stage",
+
                 variables: {},
+
                 lists: {},
+
                 broadcasts: {},
+
                 blocks: {},
+
                 comments: {},
+
                 currentCostume: 0,
-                costumes: [],
+
+                costumes: [
+                    {
+                        assetId:
+                            "ff3f2e0196df3c7d286c4c13e441b003",
+
+                        name: "backdrop1",
+
+                        md5ext:
+                            "ff3f2e0196df3c7d286c4c13e441b003.svg",
+
+                        dataFormat: "svg",
+
+                        rotationCenterX: 240,
+
+                        rotationCenterY: 180
+                    }
+                ],
+
                 sounds: [],
+
                 volume: 100,
+
                 layerOrder: 0,
+
                 tempo: 60,
-                videoState: "on",
+
                 videoTransparency: 50,
+
+                videoState: "on",
+
                 textToSpeechLanguage: null
             }
         ],
+
         monitors: [],
+
         extensions: [],
+
         meta: {
             semver: "3.0.0",
-            vm: "11.3.0",
-            agent: "Genesis2SB3 v0.4.1"
+
+            vm: "0.2.0",
+
+            agent: "Genesis2SB3 v0.4.2"
         }
     });
 }
+
+
+/* =========================================================
+   SVG BACKDROP
+========================================================= */
+
+function createBackdropSVG() {
+    var svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" ' +
+        'width="480" height="360" ' +
+        'viewBox="0 0 480 360">' +
+        '<rect width="480" height="360" fill="#ffffff"/>' +
+        '</svg>';
+
+    return new TextEncoder().encode(svg);
+}
+
+
+/* =========================================================
+   CRC32
+========================================================= */
 
 function crc32(data) {
     var table = [];
@@ -194,6 +260,11 @@ function crc32(data) {
     ) >>> 0;
 }
 
+
+/* =========================================================
+   BINARY HELPERS
+========================================================= */
+
 function u16(value) {
     return new Uint8Array([
         value & 255,
@@ -218,6 +289,7 @@ function join(parts) {
     }
 
     var output = new Uint8Array(total);
+
     var position = 0;
 
     for (var j = 0; j < parts.length; j++) {
@@ -232,35 +304,57 @@ function join(parts) {
     return output;
 }
 
+
+/* =========================================================
+   ZIP STORE WRITER
+========================================================= */
+
 function createZip(files) {
-    var local = [];
-    var central = [];
+    var localFiles = [];
+    var centralFiles = [];
+
     var offset = 0;
 
     var encoder = new TextEncoder();
 
     for (var i = 0; i < files.length; i++) {
-        var nameBytes =
-            encoder.encode(files[i].name);
+        var file = files[i];
 
-        var data = files[i].data;
+        var nameBytes =
+            encoder.encode(file.name);
+
+        var data = file.data;
 
         var crc = crc32(data);
 
         var localHeader = join([
             new Uint8Array([
-                0x50, 0x4B, 0x03, 0x04
+                0x50,
+                0x4B,
+                0x03,
+                0x04
             ]),
+
             u16(20),
+
             u16(0),
+
             u16(0),
+
             u16(0),
+
             u16(0),
+
             u32(crc),
+
             u32(data.length),
+
             u32(data.length),
+
             u16(nameBytes.length),
+
             u16(0),
+
             nameBytes
         ]);
 
@@ -269,63 +363,104 @@ function createZip(files) {
             data
         ]);
 
-        local.push(localFile);
+        localFiles.push(localFile);
+
 
         var centralHeader = join([
             new Uint8Array([
-                0x50, 0x4B, 0x01, 0x02
+                0x50,
+                0x4B,
+                0x01,
+                0x02
             ]),
+
             u16(20),
+
             u16(20),
+
             u16(0),
+
             u16(0),
+
             u16(0),
+
             u16(0),
+
             u32(crc),
+
             u32(data.length),
+
             u32(data.length),
+
             u16(nameBytes.length),
+
             u16(0),
+
             u16(0),
+
             u16(0),
+
             u16(0),
+
             u32(0),
+
             u32(offset),
+
             nameBytes
         ]);
 
-        central.push(centralHeader);
+        centralFiles.push(
+            centralHeader
+        );
 
         offset += localFile.length;
     }
 
-    var localData = join(local);
-    var centralData = join(central);
+    var localData = join(localFiles);
 
-    var end = join([
+    var centralData = join(
+        centralFiles
+    );
+
+    var endRecord = join([
         new Uint8Array([
-            0x50, 0x4B, 0x05, 0x06
+            0x50,
+            0x4B,
+            0x05,
+            0x06
         ]),
+
         u16(0),
+
         u16(0),
+
         u16(files.length),
+
         u16(files.length),
+
         u32(centralData.length),
+
         u32(localData.length),
+
         u16(0)
     ]);
 
     return join([
         localData,
         centralData,
-        end
+        endRecord
     ]);
 }
+
+
+/* =========================================================
+   GENERATE TEST SB3
+========================================================= */
 
 function createTestSB3() {
     setProgress(
         20,
-        "Creating minimal Scratch project..."
+        "Creating project.json..."
     );
 
     var projectJSON =
@@ -337,20 +472,35 @@ function createTestSB3() {
         );
 
     setProgress(
-        50,
-        "Creating SB3 archive..."
+        45,
+        "Creating backdrop..."
+    );
+
+    var backdropData =
+        createBackdropSVG();
+
+    setProgress(
+        65,
+        "Building SB3 ZIP..."
     );
 
     var zipData = createZip([
         {
             name: "project.json",
             data: projectData
+        },
+
+        {
+            name:
+                "ff3f2e0196df3c7d286c4c13e441b003.svg",
+
+            data: backdropData
         }
     ]);
 
     setProgress(
         90,
-        "Finalizing test project..."
+        "Finalizing SB3..."
     );
 
     return new Blob(
@@ -362,11 +512,17 @@ function createTestSB3() {
     );
 }
 
+
+/* =========================================================
+   TEST COMPILER
+========================================================= */
+
 function compileTestProject() {
     if (!currentROMData) {
         setStatus(
             "Select a ROM first."
         );
+
         return;
     }
 
@@ -377,7 +533,9 @@ function compileTestProject() {
     }
 
     if (result) {
-        result.classList.add("hidden");
+        result.classList.add(
+            "hidden"
+        );
     }
 
     if (compileButton) {
@@ -387,7 +545,7 @@ function compileTestProject() {
     try {
         setProgress(
             0,
-            "Starting v0.4.1 test..."
+            "Starting v0.4.2 SB3 test..."
         );
 
         generatedSB3 =
@@ -395,18 +553,16 @@ function compileTestProject() {
 
         setProgress(
             100,
-            "Test SB3 created."
+            "SB3 test created!"
         );
 
         setStatus(
-            "Minimal SB3 generated. The ROM was intentionally NOT included."
+            "v0.4.2 test SB3 generated successfully."
         );
 
         if (resultText) {
             resultText.textContent =
-                "v0.4.1 generated a minimal Scratch project (" +
-                formatBytes(generatedSB3.size) +
-                "). Try opening it in Scratch or TurboWarp.";
+                "TEST ONLY: This SB3 contains a minimal Scratch project and one backdrop. The Genesis ROM is NOT included.";
         }
 
         if (result) {
@@ -416,13 +572,37 @@ function compileTestProject() {
         }
 
         console.log(
-            "v0.4.1 test SB3 generated."
+            "================================"
         );
 
         console.log(
-            "SB3 size:",
+            "Genesis2SB3 v0.4.2 TEST"
+        );
+
+        console.log(
+            "SB3 generated:",
             generatedSB3.size,
             "bytes"
+        );
+
+        console.log(
+            "Contents:"
+        );
+
+        console.log(
+            " - project.json"
+        );
+
+        console.log(
+            " - backdrop SVG"
+        );
+
+        console.log(
+            "ROM intentionally excluded."
+        );
+
+        console.log(
+            "================================"
         );
 
     } catch (error) {
@@ -442,11 +622,17 @@ function compileTestProject() {
     }
 }
 
+
+/* =========================================================
+   DOWNLOAD
+========================================================= */
+
 function downloadSB3() {
     if (!generatedSB3) {
         setStatus(
             "Generate the test SB3 first."
         );
+
         return;
     }
 
@@ -459,8 +645,9 @@ function downloadSB3() {
         document.createElement("a");
 
     link.href = url;
+
     link.download =
-        "Genesis2SB3-v0.4.1-test.sb3";
+        "Genesis2SB3-v0.4.2-test.sb3";
 
     document.body.appendChild(link);
 
@@ -475,6 +662,11 @@ function downloadSB3() {
         1000
     );
 }
+
+
+/* =========================================================
+   UI EVENTS
+========================================================= */
 
 if (romInput) {
     romInput.addEventListener(
@@ -497,6 +689,7 @@ if (dropZone) {
         "dragover",
         function(event) {
             event.preventDefault();
+
             dropZone.classList.add(
                 "dragging"
             );
@@ -592,5 +785,5 @@ setStatus(
 );
 
 console.log(
-    "Genesis2SB3 v0.4.1 ready."
+    "Genesis2SB3 v0.4.2 ready."
 );
