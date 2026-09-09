@@ -1,54 +1,60 @@
 "use strict";
 
-/* =========================================================
-   Genesis2SB3 v0.5.4
-   Diagnostic SB3/ZIP build
-   ROM is NOT embedded.
-   ========================================================= */
+/*
+    Genesis2SB3 v0.5.5
+
+    Real ZIP/SB3 generation using JSZip.
+
+    IMPORTANT:
+    - JSZip must be loaded before this file.
+    - The ROM is NOT embedded in the SB3.
+    - This version is primarily a valid-SB3 test.
+*/
 
 console.log("THE ONE PIECE IS REAL!!!-Whitebeard (Loaded)");
-console.log("Genesis2SB3 v0.5.4 loaded.");
+console.log("Genesis2SB3 v0.5.5 loaded.");
 
-const romInput = document.getElementById("romInput");
-const dropZone = document.getElementById("dropZone");
+var romInput = document.getElementById("romInput");
+var dropZone = document.getElementById("dropZone");
 
-const romInfo = document.getElementById("romInfo");
-const romName = document.getElementById("romName");
-const romSize = document.getElementById("romSize");
-const romStatus = document.getElementById("romStatus");
-const removeRom = document.getElementById("removeRom");
+var romInfo = document.getElementById("romInfo");
+var romName = document.getElementById("romName");
+var romSize = document.getElementById("romSize");
+var romStatus = document.getElementById("romStatus");
+var removeRom = document.getElementById("removeRom");
 
-const compileButton = document.getElementById("compileButton");
+var compileButton =
+    document.getElementById("compileButton");
 
-const progressContainer =
+var progressContainer =
     document.getElementById("progressContainer");
 
-const progressBar =
+var progressBar =
     document.getElementById("progressBar");
 
-const progressText =
+var progressText =
     document.getElementById("progressText");
 
-const progressPercent =
+var progressPercent =
     document.getElementById("progressPercent");
 
-const status =
+var statusBox =
     document.getElementById("status");
 
-const result =
+var result =
     document.getElementById("result");
 
-const resultText =
+var resultText =
     document.getElementById("resultText");
 
-const downloadButton =
+var downloadButton =
     document.getElementById("downloadButton");
 
-let loadedROM = null;
-let generatedArchive = null;
+var loadedROM = null;
+var generatedSB3 = null;
 
 /* =========================================================
-   HELPERS
+   BASIC UI HELPERS
    ========================================================= */
 
 function show(element) {
@@ -64,16 +70,18 @@ function hide(element) {
 }
 
 function setStatus(message, type) {
-    if (!status) {
+    if (!statusBox) {
         return;
     }
 
-    status.textContent = message;
-    status.className = "status";
+    statusBox.textContent = message;
+    statusBox.className = "status";
 
     if (type) {
-        status.classList.add(type);
+        statusBox.classList.add(type);
     }
+
+    console.log(message);
 }
 
 function setProgress(percent, message) {
@@ -110,7 +118,26 @@ function formatBytes(bytes) {
 }
 
 /* =========================================================
-   ROM LOADER
+   JSZIP CHECK
+   ========================================================= */
+
+if (typeof JSZip === "undefined") {
+    console.error(
+        "JSZip was not found."
+    );
+
+    setStatus(
+        "ERROR: JSZip did not load. Check index.html.",
+        "error"
+    );
+} else {
+    console.log(
+        "JSZip detected successfully."
+    );
+}
+
+/* =========================================================
+   ROM LOADING
    ========================================================= */
 
 function loadROM(file) {
@@ -119,10 +146,22 @@ function loadROM(file) {
     }
 
     loadedROM = file;
-    generatedArchive = null;
+    generatedSB3 = null;
+
+    console.log(
+        "ROM selected:",
+        file.name
+    );
+
+    console.log(
+        "ROM size:",
+        file.size,
+        "bytes"
+    );
 
     if (romName) {
-        romName.textContent = file.name;
+        romName.textContent =
+            file.name;
     }
 
     if (romSize) {
@@ -132,7 +171,7 @@ function loadROM(file) {
 
     if (romStatus) {
         romStatus.textContent =
-            "ROM loaded successfully";
+            "ROM detected";
     }
 
     show(romInfo);
@@ -150,18 +189,11 @@ function loadROM(file) {
         "ROM loaded successfully. Ready to compile.",
         "success"
     );
-
-    console.log(
-        "ROM:",
-        file.name
-    );
-
-    console.log(
-        "ROM size:",
-        file.size,
-        "bytes"
-    );
 }
+
+/* =========================================================
+   FILE INPUT
+   ========================================================= */
 
 if (romInput) {
     romInput.addEventListener(
@@ -177,23 +209,29 @@ if (romInput) {
             }
         }
     );
+
+    console.log(
+        "#romInput found."
+    );
+} else {
+    console.error(
+        "Could not find #romInput."
+    );
 }
 
-if (dropZone) {
-    dropZone.addEventListener(
-        "click",
-        function () {
-            if (romInput) {
-                romInput.click();
-            }
-        }
-    );
+/* =========================================================
+   DROP ZONE
+   ========================================================= */
 
+if (dropZone) {
     dropZone.addEventListener(
         "dragover",
         function (event) {
             event.preventDefault();
-            dropZone.classList.add("dragging");
+
+            dropZone.classList.add(
+                "dragging"
+            );
         }
     );
 
@@ -225,6 +263,10 @@ if (dropZone) {
             }
         }
     );
+
+    console.log(
+        "#dropZone found."
+    );
 }
 
 /* =========================================================
@@ -236,7 +278,7 @@ if (removeRom) {
         "click",
         function () {
             loadedROM = null;
-            generatedArchive = null;
+            generatedSB3 = null;
 
             if (romInput) {
                 romInput.value = "";
@@ -259,95 +301,18 @@ if (removeRom) {
             );
 
             setStatus(
-                "No ROM loaded."
+                "Select a Genesis ROM to begin."
+            );
+
+            console.log(
+                "ROM removed."
             );
         }
     );
 }
 
 /* =========================================================
-   BINARY HELPERS
-   ========================================================= */
-
-function textBytes(text) {
-    return new TextEncoder().encode(text);
-}
-
-function u16(value) {
-    return new Uint8Array([
-        value & 0xff,
-        (value >>> 8) & 0xff
-    ]);
-}
-
-function u32(value) {
-    return new Uint8Array([
-        value & 0xff,
-        (value >>> 8) & 0xff,
-        (value >>> 16) & 0xff,
-        (value >>> 24) & 0xff
-    ]);
-}
-
-function concat() {
-    const parts = Array.from(arguments);
-
-    let total = 0;
-
-    for (const part of parts) {
-        total += part.length;
-    }
-
-    const output =
-        new Uint8Array(total);
-
-    let offset = 0;
-
-    for (const part of parts) {
-        output.set(part, offset);
-        offset += part.length;
-    }
-
-    return output;
-}
-
-/* =========================================================
-   CRC32
-   ========================================================= */
-
-function crc32(data) {
-    let crc = 0xffffffff;
-
-    for (
-        let i = 0;
-        i < data.length;
-        i++
-    ) {
-        crc ^= data[i];
-
-        for (
-            let bit = 0;
-            bit < 8;
-            bit++
-        ) {
-            if (crc & 1) {
-                crc =
-                    (crc >>> 1) ^
-                    0xedb88320;
-            } else {
-                crc >>>= 1;
-            }
-        }
-    }
-
-    return (
-        crc ^
-        0xffffffff
-    ) >>> 0;
-}
-
-/* =========================================================
-   MINIMAL SCRATCH PROJECT
+   SCRATCH PROJECT
    ========================================================= */
 
 function createProjectJSON() {
@@ -414,169 +379,45 @@ function createProjectJSON() {
 
             vm: "11.3.0",
 
-            agent: "Genesis2SB3 v0.5.4"
+            agent:
+                "Genesis2SB3 v0.5.5"
         }
     };
 }
 
 /* =========================================================
-   MINIMAL SVG
+   SVG BACKDROP
    ========================================================= */
 
-function createBackdrop() {
-    return textBytes(
-        '<svg xmlns="http://www.w3.org/2000/svg" ' +
-        'width="480" height="360" ' +
-        'viewBox="0 0 480 360">' +
-        '<rect width="480" height="360" fill="#111111"/>' +
+function createBackdropSVG() {
+    return [
+        '<svg ',
+        'xmlns="http://www.w3.org/2000/svg" ',
+        'width="480" ',
+        'height="360" ',
+        'viewBox="0 0 480 360">',
+        '<rect ',
+        'width="480" ',
+        'height="360" ',
+        'fill="#111111"/>',
         '</svg>'
-    );
+    ].join("");
 }
 
 /* =========================================================
-   ZIP CREATOR
+   BUILD SB3
    ========================================================= */
 
-function createZip(files) {
-    const localRecords = [];
-    const centralRecords = [];
-
-    let currentOffset = 0;
-
-    for (const file of files) {
-        const name =
-            textBytes(file.name);
-
-        const data =
-            file.data;
-
-        const checksum =
-            crc32(data);
-
-        const localHeader =
-            concat(
-                u32(0x04034b50),
-
-                u16(20),
-
-                u16(0),
-
-                u16(0),
-
-                u16(0),
-
-                u16(0),
-
-                u32(checksum),
-
-                u32(data.length),
-
-                u32(data.length),
-
-                u16(name.length),
-
-                u16(0),
-
-                name
-            );
-
-        localRecords.push(
-            localHeader,
-            data
-        );
-
-        const centralHeader =
-            concat(
-                u32(0x02014b50),
-
-                u16(20),
-
-                u16(20),
-
-                u16(0),
-
-                u16(0),
-
-                u16(0),
-
-                u32(checksum),
-
-                u32(data.length),
-
-                u32(data.length),
-
-                u16(name.length),
-
-                u16(0),
-
-                u16(0),
-
-                u16(0),
-
-                u16(0),
-
-                u32(0),
-
-                u32(currentOffset),
-
-                name
-            );
-
-        centralRecords.push(
-            centralHeader
-        );
-
-        currentOffset +=
-            localHeader.length +
-            data.length;
-    }
-
-    const localData =
-        concat.apply(
-            null,
-            localRecords
-        );
-
-    const centralData =
-        concat.apply(
-            null,
-            centralRecords
-        );
-
-    const endRecord =
-        concat(
-            u32(0x06054b50),
-
-            u16(0),
-
-            u16(0),
-
-            u16(files.length),
-
-            u16(files.length),
-
-            u32(centralData.length),
-
-            u32(localData.length),
-
-            u16(0)
-        );
-
-    return concat(
-        localData,
-        centralData,
-        endRecord
-    );
-}
-
-/* =========================================================
-   BUILD DIAGNOSTIC ARCHIVE
-   ========================================================= */
-
-async function compileProject() {
+async function buildSB3() {
     if (!loadedROM) {
         throw new Error(
             "No ROM has been loaded."
+        );
+    }
+
+    if (typeof JSZip === "undefined") {
+        throw new Error(
+            "JSZip is not loaded."
         );
     }
 
@@ -586,68 +427,100 @@ async function compileProject() {
     );
 
     /*
-       The ROM is read here only to verify
-       that the input pipeline works.
+        Read the ROM to verify that the ROM
+        pipeline works.
 
-       It is NOT included in the archive.
+        We deliberately DO NOT store it
+        inside the SB3 yet.
     */
 
-    await loadedROM.arrayBuffer();
+    var romBuffer =
+        await loadedROM.arrayBuffer();
 
-    setProgress(
-        35,
-        "Generating project.json..."
+    console.log(
+        "ROM read successfully:",
+        romBuffer.byteLength,
+        "bytes"
     );
 
-    const projectJSON =
-        textBytes(
-            JSON.stringify(
-                createProjectJSON()
-            )
+    setProgress(
+        30,
+        "Creating Scratch project..."
+    );
+
+    var project =
+        createProjectJSON();
+
+    var projectText =
+        JSON.stringify(
+            project
         );
 
     setProgress(
-        60,
-        "Generating backdrop..."
+        50,
+        "Adding project.json..."
     );
 
-    const backdrop =
-        createBackdrop();
+    var zip =
+        new JSZip();
+
+    zip.file(
+        "project.json",
+        projectText
+    );
+
+    setProgress(
+        65,
+        "Adding Scratch asset..."
+    );
+
+    zip.file(
+        "ff3f2e0196df3c7d286c4c13e441b003.svg",
+        createBackdropSVG()
+    );
 
     setProgress(
         80,
-        "Building ZIP..."
+        "Generating SB3..."
     );
 
-    const archive =
-        createZip([
+    var blob =
+        await zip.generateAsync(
             {
-                name: "project.json",
-                data: projectJSON
+                type: "blob",
+
+                mimeType:
+                    "application/x.scratch.sb3",
+
+                compression:
+                    "STORE"
             },
 
-            {
-                name:
-                    "ff3f2e0196df3c7d286c4c13e441b003.svg",
-                data: backdrop
+            function (metadata) {
+                var percent =
+                    80 +
+                    (
+                        metadata.percent * 0.2
+                    );
+
+                setProgress(
+                    percent,
+                    "Generating SB3..."
+                );
             }
-        ]);
+        );
 
-    setProgress(
-        100,
-        "Archive ready."
+    console.log(
+        "SB3 generated:",
+        blob.size,
+        "bytes"
     );
 
-    return new Blob(
-        [archive],
-        {
-            type: "application/zip"
-        }
-    );
+    return blob;
 }
 
 /* =========================================================
-   COMPILE
+   COMPILE BUTTON
    ========================================================= */
 
 if (compileButton) {
@@ -656,19 +529,33 @@ if (compileButton) {
         async function () {
             if (!loadedROM) {
                 setStatus(
-                    "Load a ROM first.",
+                    "Please select a ROM first.",
                     "error"
                 );
 
                 return;
             }
 
-            compileButton.disabled = true;
+            if (
+                typeof JSZip ===
+                "undefined"
+            ) {
+                setStatus(
+                    "JSZip is missing. Check index.html.",
+                    "error"
+                );
+
+                return;
+            }
+
+            compileButton.disabled =
+                true;
 
             hide(result);
 
             if (downloadButton) {
-                downloadButton.disabled = true;
+                downloadButton.disabled =
+                    true;
             }
 
             show(progressContainer);
@@ -676,125 +563,139 @@ if (compileButton) {
             try {
                 setProgress(
                     0,
-                    "Starting diagnostic build..."
+                    "Starting compiler..."
                 );
 
                 setStatus(
-                    "Building diagnostic archive..."
+                    "Compiling ROM..."
                 );
 
                 console.log(
-                    "Starting v0.5.4 diagnostic build."
+                    "Genesis2SB3 v0.5.5 compile started."
                 );
 
-                generatedArchive =
-                    await compileProject();
+                generatedSB3 =
+                    await buildSB3();
 
-                console.log(
-                    "Archive generated:",
-                    generatedArchive.size,
-                    "bytes"
+                setProgress(
+                    100,
+                    "Compilation complete!"
+                );
+
+                setStatus(
+                    "SB3 generated successfully.",
+                    "success"
                 );
 
                 show(result);
 
                 if (resultText) {
                     resultText.textContent =
-                        "Diagnostic archive generated: " +
+                        "Generated a valid ZIP-based SB3 " +
+                        "without embedding the ROM. " +
+                        "File size: " +
                         formatBytes(
-                            generatedArchive.size
-                        ) +
-                        ". Download the ZIP and inspect its contents.";
+                            generatedSB3.size
+                        );
                 }
 
                 if (downloadButton) {
-                    downloadButton.disabled = false;
+                    downloadButton.disabled =
+                        false;
 
                     downloadButton.style.display =
                         "inline-block";
 
                     downloadButton.textContent =
-                        "Download Diagnostic ZIP";
+                        "Download .sb3";
                 }
 
-                setStatus(
-                    "Diagnostic ZIP generated successfully.",
-                    "success"
+                console.log(
+                    "Compilation finished."
                 );
 
             } catch (error) {
+                generatedSB3 = null;
+
                 console.error(
-                    "Build failed:",
+                    "Compilation error:",
                     error
                 );
 
-                generatedArchive = null;
-
-                hide(result);
-
                 setProgress(
                     0,
-                    "Build failed."
+                    "Compilation failed."
                 );
 
                 setStatus(
-                    "Build failed: " +
+                    "Compilation failed: " +
                     error.message,
                     "error"
                 );
 
+                hide(result);
+
             } finally {
-                compileButton.disabled = false;
+                compileButton.disabled =
+                    false;
             }
         }
     );
 }
 
 /* =========================================================
-   DOWNLOAD
+   DOWNLOAD BUTTON
    ========================================================= */
 
 if (downloadButton) {
     downloadButton.addEventListener(
         "click",
         function () {
-            if (!generatedArchive) {
+            if (!generatedSB3) {
                 setStatus(
-                    "No diagnostic archive exists yet.",
+                    "No SB3 has been generated yet.",
                     "error"
                 );
 
                 return;
             }
 
-            const url =
+            var url =
                 URL.createObjectURL(
-                    generatedArchive
+                    generatedSB3
                 );
 
-            const link =
-                document.createElement("a");
+            var link =
+                document.createElement(
+                    "a"
+                );
 
             link.href = url;
 
             link.download =
-                "Genesis2SB3-v0.5.4-diagnostic.zip";
+                "Genesis2SB3-v0.5.5.sb3";
 
-            document.body.appendChild(link);
+            document.body.appendChild(
+                link
+            );
 
             link.click();
 
-            link.remove();
+            document.body.removeChild(
+                link
+            );
 
             setTimeout(
                 function () {
-                    URL.revokeObjectURL(url);
+                    URL.revokeObjectURL(
+                        url
+                    );
                 },
                 1000
             );
 
             console.log(
-                "Diagnostic ZIP download started."
+                "SB3 download started."
             );
         }
     );
@@ -805,11 +706,13 @@ if (downloadButton) {
    ========================================================= */
 
 if (compileButton) {
-    compileButton.disabled = true;
+    compileButton.disabled =
+        true;
 }
 
 if (downloadButton) {
-    downloadButton.disabled = true;
+    downloadButton.disabled =
+        true;
 }
 
 hide(romInfo);
@@ -820,10 +723,15 @@ setProgress(
     "Waiting for ROM..."
 );
 
-setStatus(
-    "Load a Genesis ROM to begin."
-);
+if (
+    typeof JSZip !==
+    "undefined"
+) {
+    setStatus(
+        "Load a Genesis ROM to begin."
+    );
+}
 
 console.log(
-    "Genesis2SB3 v0.5.4 ready."
+    "Genesis2SB3 v0.5.5 ready."
 );
