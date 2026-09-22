@@ -23,9 +23,10 @@ var downloadButton = document.getElementById("downloadButton");
 
 var currentROM = null;
 
-/* =========================
-   BASIC HELPERS
-========================= */
+
+/* =========================================================
+   UI HELPERS
+========================================================= */
 
 function show(element) {
     if (element) {
@@ -63,7 +64,8 @@ function setProgress(percent, message) {
     }
 
     if (progressPercent) {
-        progressPercent.textContent = Math.round(percent) + "%";
+        progressPercent.textContent =
+            Math.round(percent) + "%";
     }
 
     if (progressText) {
@@ -71,9 +73,10 @@ function setProgress(percent, message) {
     }
 }
 
-/* =========================
+
+/* =========================================================
    ROM LOADING
-========================= */
+========================================================= */
 
 function loadROM(file) {
     if (!file) {
@@ -87,232 +90,401 @@ function loadROM(file) {
     }
 
     if (romSize) {
-        romSize.textContent = formatBytes(file.size);
+        romSize.textContent =
+            formatBytes(file.size);
     }
 
     if (romStatus) {
-        romStatus.textContent = "ROM loaded successfully.";
+        romStatus.textContent =
+            "ROM loaded successfully.";
     }
 
     show(romInfo);
     show(compileButton);
 
-    setStatus("ROM loaded successfully. Compiler ready.");
+    setStatus(
+        "ROM loaded successfully. Compiler ready."
+    );
 }
 
 if (romInput) {
-    romInput.addEventListener("change", function () {
-        if (this.files && this.files.length > 0) {
-            loadROM(this.files[0]);
+    romInput.addEventListener(
+        "change",
+        function () {
+            if (
+                this.files &&
+                this.files.length > 0
+            ) {
+                loadROM(this.files[0]);
+            }
         }
-    });
+    );
 }
 
 if (dropZone) {
-    dropZone.addEventListener("dragover", function (event) {
-        event.preventDefault();
-        dropZone.classList.add("dragging");
-    });
-
-    dropZone.addEventListener("dragleave", function () {
-        dropZone.classList.remove("dragging");
-    });
-
-    dropZone.addEventListener("drop", function (event) {
-        event.preventDefault();
-
-        dropZone.classList.remove("dragging");
-
-        if (
-            event.dataTransfer &&
-            event.dataTransfer.files &&
-            event.dataTransfer.files.length > 0
-        ) {
-            loadROM(event.dataTransfer.files[0]);
+    dropZone.addEventListener(
+        "dragover",
+        function (event) {
+            event.preventDefault();
+            dropZone.classList.add("dragging");
         }
-    });
+    );
 
-    dropZone.addEventListener("click", function () {
-        if (romInput) {
-            romInput.click();
+    dropZone.addEventListener(
+        "dragleave",
+        function () {
+            dropZone.classList.remove("dragging");
         }
-    });
+    );
+
+    dropZone.addEventListener(
+        "drop",
+        function (event) {
+            event.preventDefault();
+
+            dropZone.classList.remove(
+                "dragging"
+            );
+
+            if (
+                event.dataTransfer &&
+                event.dataTransfer.files &&
+                event.dataTransfer.files.length > 0
+            ) {
+                loadROM(
+                    event.dataTransfer.files[0]
+                );
+            }
+        }
+    );
+
+    dropZone.addEventListener(
+        "click",
+        function () {
+            if (romInput) {
+                romInput.click();
+            }
+        }
+    );
 }
 
 if (removeRom) {
-    removeRom.addEventListener("click", function () {
-        currentROM = null;
+    removeRom.addEventListener(
+        "click",
+        function () {
+            currentROM = null;
 
-        if (romInput) {
-            romInput.value = "";
+            if (romInput) {
+                romInput.value = "";
+            }
+
+            hide(romInfo);
+            hide(compileButton);
+            hide(result);
+
+            setStatus(
+                "No ROM loaded."
+            );
         }
-
-        hide(romInfo);
-        hide(compileButton);
-        hide(result);
-
-        setStatus("No ROM loaded.");
-    });
+    );
 }
 
-/* =========================
-   DIAGNOSTIC SCREEN
-========================= */
+
+/* =========================================================
+   SVG DIAGNOSTIC SCREEN
+========================================================= */
+
+function escapeXML(text) {
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
+}
 
 function createDiagnosticSVG() {
+    var filename =
+        currentROM
+            ? currentROM.name
+            : "No ROM";
+
+    var filesize =
+        currentROM
+            ? formatBytes(currentROM.size)
+            : "0 B";
+
     return `
 <svg xmlns="http://www.w3.org/2000/svg"
      width="480"
      height="360"
      viewBox="0 0 480 360">
 
-    <rect width="480" height="360" fill="#111111"/>
+    <rect
+        x="0"
+        y="0"
+        width="480"
+        height="360"
+        fill="#202020"/>
 
-    <text x="240" y="42"
-          text-anchor="middle"
-          font-family="Arial, sans-serif"
-          font-size="25"
-          font-weight="bold"
-          fill="white">
-        Genesis2SB3
+    <rect
+        x="12"
+        y="12"
+        width="456"
+        height="336"
+        fill="#101010"
+        stroke="#ffffff"
+        stroke-width="2"/>
+
+    <text
+        x="240"
+        y="42"
+        text-anchor="middle"
+        font-family="Arial, sans-serif"
+        font-size="27"
+        font-weight="bold"
+        fill="#ffffff">
+        GENESIS2SB3
     </text>
 
-    <text x="240" y="67"
-          text-anchor="middle"
-          font-family="Arial, sans-serif"
-          font-size="13"
-          fill="#bbbbbb">
-        Genesis Runtime Diagnostic
+    <text
+        x="240"
+        y="63"
+        text-anchor="middle"
+        font-family="Arial, sans-serif"
+        font-size="11"
+        fill="#aaaaaa">
+        RUNTIME DIAGNOSTIC
     </text>
 
-    <line x1="35" y1="82"
-          x2="445" y2="82"
-          stroke="#444444"/>
+    <line
+        x1="30"
+        y1="76"
+        x2="450"
+        y2="76"
+        stroke="#555555"/>
 
-    <text x="45" y="108"
-          font-family="Arial, sans-serif"
-          font-size="14"
-          fill="white">
-        ROM
+    <text
+        x="30"
+        y="100"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffffff">
+        ROM:
     </text>
 
-    <text x="400" y="108"
-          text-anchor="end"
-          font-family="Arial, sans-serif"
-          font-size="14"
-          fill="#55ff88">
+    <text
+        x="450"
+        y="100"
+        text-anchor="end"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#55ff88">
+        ${escapeXML(filename)}
+    </text>
+
+    <text
+        x="30"
+        y="121"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffffff">
+        SIZE:
+    </text>
+
+    <text
+        x="450"
+        y="121"
+        text-anchor="end"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#55ff88">
+        ${escapeXML(filesize)}
+    </text>
+
+    <line
+        x1="30"
+        y1="136"
+        x2="450"
+        y2="136"
+        stroke="#333333"/>
+
+    <text
+        x="30"
+        y="158"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffffff">
+        ROM LOADED
+    </text>
+
+    <text
+        x="450"
+        y="158"
+        text-anchor="end"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#55ff88">
+        YES
+    </text>
+
+    <text
+        x="30"
+        y="180"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffffff">
+        JSZIP ARCHIVE
+    </text>
+
+    <text
+        x="450"
+        y="180"
+        text-anchor="end"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#55ff88">
+        VERIFIED
+    </text>
+
+    <text
+        x="30"
+        y="202"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffffff">
+        SB3 PROJECT
+    </text>
+
+    <text
+        x="450"
+        y="202"
+        text-anchor="end"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#55ff88">
         LOADED
     </text>
 
-    <text x="45" y="135"
-          font-family="Arial, sans-serif"
-          font-size="14"
-          fill="white">
+    <line
+        x1="30"
+        y1="217"
+        x2="450"
+        y2="217"
+        stroke="#333333"/>
+
+    <text
+        x="30"
+        y="239"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffffff">
         68000 CPU
     </text>
 
-    <text x="400" y="135"
-          text-anchor="end"
-          font-family="Arial, sans-serif"
-          font-size="14"
-          fill="#ffaa44">
+    <text
+        x="450"
+        y="239"
+        text-anchor="end"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffaa44">
         NOT IMPLEMENTED
     </text>
 
-    <text x="45" y="162"
-          font-family="Arial, sans-serif"
-          font-size="14"
-          fill="white">
+    <text
+        x="30"
+        y="259"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffffff">
         Z80
     </text>
 
-    <text x="400" y="162"
-          text-anchor="end"
-          font-family="Arial, sans-serif"
-          font-size="14"
-          fill="#ffaa44">
+    <text
+        x="450"
+        y="259"
+        text-anchor="end"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffaa44">
         NOT IMPLEMENTED
     </text>
 
-    <text x="45" y="189"
-          font-family="Arial, sans-serif"
-          font-size="14"
-          fill="white">
+    <text
+        x="30"
+        y="279"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffffff">
         VDP
     </text>
 
-    <text x="400" y="189"
-          text-anchor="end"
-          font-family="Arial, sans-serif"
-          font-size="14"
-          fill="#ffaa44">
+    <text
+        x="450"
+        y="279"
+        text-anchor="end"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffaa44">
         NOT IMPLEMENTED
     </text>
 
-    <text x="45" y="216"
-          font-family="Arial, sans-serif"
-          font-size="14"
-          fill="white">
-        YM2612 Audio
+    <text
+        x="30"
+        y="299"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffffff">
+        YM2612
     </text>
 
-    <text x="400" y="216"
-          text-anchor="end"
-          font-family="Arial, sans-serif"
-          font-size="14"
-          fill="#ffaa44">
+    <text
+        x="450"
+        y="299"
+        text-anchor="end"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffaa44">
         NOT IMPLEMENTED
     </text>
 
-    <text x="45" y="243"
-          font-family="Arial, sans-serif"
-          font-size="14"
-          fill="white">
-        Controller
+    <text
+        x="30"
+        y="319"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffffff">
+        CONTROLLER
     </text>
 
-    <text x="400" y="243"
-          text-anchor="end"
-          font-family="Arial, sans-serif"
-          font-size="14"
-          fill="#ffaa44">
+    <text
+        x="450"
+        y="319"
+        text-anchor="end"
+        font-family="Arial, sans-serif"
+        font-size="13"
+        fill="#ffaa44">
         NOT IMPLEMENTED
     </text>
 
-    <line x1="35" y1="265"
-          x2="445" y2="265"
-          stroke="#444444"/>
-
-    <text x="240" y="292"
-          text-anchor="middle"
-          font-family="Arial, sans-serif"
-          font-size="14"
-          fill="#dddddd">
-        ROM parsing complete.
-    </text>
-
-    <text x="240" y="314"
-          text-anchor="middle"
-          font-family="Arial, sans-serif"
-          font-size="14"
-          fill="#dddddd">
-        Genesis machine runtime is the next stage.
-    </text>
-
-    <text x="240" y="342"
-          text-anchor="middle"
-          font-family="Arial, sans-serif"
-          font-size="11"
-          fill="#777777">
-        Genesis2SB3 v0.6 diagnostic
+    <text
+        x="240"
+        y="340"
+        text-anchor="middle"
+        font-family="Arial, sans-serif"
+        font-size="9"
+        fill="#777777">
+        Genesis2SB3 v0.6
     </text>
 
 </svg>`;
 }
 
-/* =========================
-   SCRATCH PROJECT
-========================= */
+
+/* =========================================================
+   SCRATCH PROJECT JSON
+========================================================= */
 
 function createProjectJSON() {
     return {
@@ -322,25 +494,29 @@ function createProjectJSON() {
                 name: "Stage",
 
                 variables: {},
-
                 lists: {},
-
                 broadcasts: {},
-
                 blocks: {},
-
                 comments: {},
 
                 currentCostume: 0,
 
                 costumes: [
                     {
-                        assetId: "ff3f2e0196df3c7d286c4c13e441b003",
-                        name: "Genesis2SB3 Diagnostic",
+                        assetId:
+                            "ff3f2e0196df3c7d286c4c13e441b003",
+
+                        name:
+                            "Genesis2SB3 Diagnostic",
+
                         bitmapResolution: 1,
+
                         md5ext:
                             "ff3f2e0196df3c7d286c4c13e441b003.svg",
-                        dataFormat: "svg",
+
+                        dataFormat:
+                            "svg",
+
                         rotationCenterX: 240,
                         rotationCenterY: 180
                     }
@@ -372,84 +548,113 @@ function createProjectJSON() {
     };
 }
 
-/* =========================
-   BUILD SB3 WITH JSZIP
-========================= */
+
+/* =========================================================
+   BUILD
+========================================================= */
 
 async function buildSB3() {
     if (!currentROM) {
-        setStatus("Please load a Genesis ROM first.");
+        setStatus(
+            "Please load a Genesis ROM first."
+        );
         return;
     }
 
     if (typeof JSZip === "undefined") {
-        setStatus("ERROR: JSZip is not loaded.");
-        console.error(
-            "JSZip is undefined. Make sure jszip.min.js is loaded before app.js."
+        setStatus(
+            "ERROR: JSZip is not loaded."
         );
+
+        console.error(
+            "JSZip is undefined."
+        );
+
         return;
     }
 
     try {
         show(progressContainer);
-
         hide(result);
 
-        setProgress(5, "Reading ROM...");
+        setProgress(
+            5,
+            "Reading ROM..."
+        );
 
-        var romBuffer = await currentROM.arrayBuffer();
+        var romBuffer =
+            await currentROM.arrayBuffer();
 
-        var romBytes = new Uint8Array(romBuffer);
+        var romBytes =
+            new Uint8Array(romBuffer);
 
-        console.log("ROM size:", romBytes.length);
-        console.log("ROM filename:", currentROM.name);
+        console.log(
+            "ROM size:",
+            romBytes.length
+        );
 
-        setProgress(20, "ROM loaded.");
+        console.log(
+            "ROM filename:",
+            currentROM.name
+        );
 
-        /* =========================
-           BASIC GENESIS DETECTION
-        ========================= */
+        setProgress(
+            20,
+            "ROM loaded."
+        );
 
-        var isGenesisSized =
+        setProgress(
+            35,
+            "Checking Genesis ROM..."
+        );
+
+        var genesisSized =
             romBytes.length >= 0x200 &&
             romBytes.length <= 0x1000000;
 
         console.log(
             "Genesis-sized ROM:",
-            isGenesisSized
+            genesisSized
         );
 
-        setProgress(35, "Checking Genesis ROM structure...");
+        setProgress(
+            50,
+            "Creating Scratch project..."
+        );
+
+        var project =
+            createProjectJSON();
+
+        var projectText =
+            JSON.stringify(
+                project,
+                null,
+                2
+            );
+
+        setProgress(
+            60,
+            "Creating visible diagnostic..."
+        );
+
+        var svg =
+            createDiagnosticSVG();
 
         /*
-         * We are deliberately NOT putting the ROM inside
-         * the SB3 archive yet.
+         * IMPORTANT:
          *
-         * The ROM is read by Genesis2SB3 here and will later
-         * be converted into the runtime representation.
+         * JSZip is the ONLY ZIP writer.
+         * We are NOT manually constructing
+         * ZIP headers or PK signatures.
          */
 
-        setProgress(50, "Creating Scratch project...");
-
-        var project = createProjectJSON();
-
-        var projectText = JSON.stringify(
-            project,
-            null,
-            2
+        console.log(
+            "JSZip loaded:",
+            typeof JSZip
         );
 
-        setProgress(65, "Creating diagnostic stage...");
-
-        var svg = createDiagnosticSVG();
-
-        /* =========================
-           JSZIP
-        ========================= */
-
-        console.log("Creating SB3 with JSZip...");
-
-        var zip = new JSZip();
+        var zip =
+            new JSZip();
 
         zip.file(
             "project.json",
@@ -461,52 +666,62 @@ async function buildSB3() {
             svg
         );
 
-        setProgress(75, "Building ZIP archive with JSZip...");
-
-        var blob = await zip.generateAsync(
-            {
-                type: "blob",
-                mimeType: "application/x.scratch.sb3",
-                compression: "STORE"
-            },
-            function (metadata) {
-                var percent =
-                    75 +
-                    (metadata.percent * 0.20);
-
-                setProgress(
-                    percent,
-                    "Building SB3 archive..."
-                );
-            }
+        setProgress(
+            70,
+            "Generating SB3 with JSZip..."
         );
 
-        /* =========================
-           VERIFY ZIP
-        ========================= */
+        var blob =
+            await zip.generateAsync(
+                {
+                    type: "blob",
 
-        var outputBytes = new Uint8Array(
-            await blob.arrayBuffer()
-        );
+                    mimeType:
+                        "application/x.scratch.sb3",
+
+                    compression:
+                        "STORE"
+                },
+
+                function (metadata) {
+                    var percent =
+                        70 +
+                        metadata.percent * 0.25;
+
+                    setProgress(
+                        percent,
+                        "Building SB3 archive..."
+                    );
+                }
+            );
+
+        /* =================================================
+           ZIP VERIFICATION
+        ================================================= */
+
+        var bytes =
+            new Uint8Array(
+                await blob.arrayBuffer()
+            );
 
         console.log(
             "Generated SB3 size:",
-            outputBytes.length
+            bytes.length
         );
 
         console.log(
-            "First 4 bytes:",
+            "First four bytes:",
             Array.from(
-                outputBytes.slice(0, 4)
+                bytes.slice(0, 4)
             )
         );
 
         if (
-            outputBytes[0] !== 80 ||
-            outputBytes[1] !== 75
+            bytes[0] !== 80 ||
+            bytes[1] !== 75
         ) {
             throw new Error(
-                "JSZip generated an invalid ZIP signature."
+                "JSZip did not produce a valid ZIP archive."
             );
         }
 
@@ -519,39 +734,47 @@ async function buildSB3() {
             "SB3 generated successfully."
         );
 
-        var url = URL.createObjectURL(blob);
+        var url =
+            URL.createObjectURL(blob);
 
         if (downloadButton) {
-            downloadButton.onclick = function () {
-                var link =
-                    document.createElement("a");
+            downloadButton.onclick =
+                function () {
+                    var link =
+                        document.createElement(
+                            "a"
+                        );
 
-                link.href = url;
+                    link.href = url;
 
-                link.download =
-                    "Genesis2SB3-v0.6-diagnostic.sb3";
+                    link.download =
+                        "Genesis2SB3-v0.6-diagnostic.sb3";
 
-                document.body.appendChild(link);
+                    document.body.appendChild(
+                        link
+                    );
 
-                link.click();
+                    link.click();
 
-                link.remove();
-            };
+                    link.remove();
+                };
         }
 
         if (resultText) {
             resultText.textContent =
-                "Genesis2SB3 generated a valid SB3 diagnostic project.";
+                "SB3 generated successfully. " +
+                "JSZip archive verified. " +
+                "Diagnostic screen included.";
         }
 
         show(result);
 
         setStatus(
-            "SB3 generated successfully. JSZip archive verified."
+            "SB3 generated successfully."
         );
 
         console.log(
-            "Genesis2SB3 diagnostic SB3 generated successfully."
+            "Genesis2SB3 v0.6 diagnostic generated."
         );
 
     } catch (error) {
@@ -561,7 +784,8 @@ async function buildSB3() {
         );
 
         setStatus(
-            "Build failed: " + error.message
+            "Build failed: " +
+            error.message
         );
 
         if (progressText) {
@@ -571,9 +795,10 @@ async function buildSB3() {
     }
 }
 
-/* =========================
+
+/* =========================================================
    COMPILE BUTTON
-========================= */
+========================================================= */
 
 if (compileButton) {
     compileButton.addEventListener(
