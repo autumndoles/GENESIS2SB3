@@ -90,8 +90,7 @@ function loadROM(file) {
     }
 
     if (romSize) {
-        romSize.textContent =
-            formatBytes(file.size);
+        romSize.textContent = formatBytes(file.size);
     }
 
     if (romStatus) {
@@ -99,13 +98,56 @@ function loadROM(file) {
             "ROM loaded successfully.";
     }
 
+    /*
+     * Make the ROM information visible.
+     */
     show(romInfo);
-    show(compileButton);
+
+    /*
+     * IMPORTANT:
+     * Explicitly enable the Compile button.
+     *
+     * This handles all of the following:
+     * - disabled HTML attribute
+     * - hidden class
+     * - custom disabled class
+     */
+    if (compileButton) {
+        compileButton.disabled = false;
+        compileButton.removeAttribute("disabled");
+
+        compileButton.classList.remove(
+            "disabled"
+        );
+
+        compileButton.classList.remove(
+            "hidden"
+        );
+
+        /*
+         * Some CSS setups use aria-disabled
+         * instead of the disabled attribute.
+         */
+        compileButton.setAttribute(
+            "aria-disabled",
+            "false"
+        );
+    }
 
     setStatus(
         "ROM loaded successfully. Compiler ready."
     );
+
+    console.log(
+        "ROM ready for compilation:",
+        file.name
+    );
 }
+
+
+/* =========================================================
+   FILE INPUT
+========================================================= */
 
 if (romInput) {
     romInput.addEventListener(
@@ -115,25 +157,37 @@ if (romInput) {
                 this.files &&
                 this.files.length > 0
             ) {
-                loadROM(this.files[0]);
+                loadROM(
+                    this.files[0]
+                );
             }
         }
     );
 }
+
+
+/* =========================================================
+   DRAG AND DROP
+========================================================= */
 
 if (dropZone) {
     dropZone.addEventListener(
         "dragover",
         function (event) {
             event.preventDefault();
-            dropZone.classList.add("dragging");
+
+            dropZone.classList.add(
+                "dragging"
+            );
         }
     );
 
     dropZone.addEventListener(
         "dragleave",
         function () {
-            dropZone.classList.remove("dragging");
+            dropZone.classList.remove(
+                "dragging"
+            );
         }
     );
 
@@ -168,6 +222,11 @@ if (dropZone) {
     );
 }
 
+
+/* =========================================================
+   REMOVE ROM
+========================================================= */
+
 if (removeRom) {
     removeRom.addEventListener(
         "click",
@@ -182,6 +241,24 @@ if (removeRom) {
             hide(compileButton);
             hide(result);
 
+            /*
+             * Disable the compiler again after
+             * removing the ROM.
+             */
+            if (compileButton) {
+                compileButton.disabled = true;
+
+                compileButton.setAttribute(
+                    "disabled",
+                    "disabled"
+                );
+
+                compileButton.setAttribute(
+                    "aria-disabled",
+                    "true"
+                );
+            }
+
             setStatus(
                 "No ROM loaded."
             );
@@ -191,7 +268,7 @@ if (removeRom) {
 
 
 /* =========================================================
-   SVG DIAGNOSTIC SCREEN
+   XML ESCAPING
 ========================================================= */
 
 function escapeXML(text) {
@@ -202,6 +279,11 @@ function escapeXML(text) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&apos;");
 }
+
+
+/* =========================================================
+   DIAGNOSTIC SVG
+========================================================= */
 
 function createDiagnosticSVG() {
     var filename =
@@ -483,7 +565,7 @@ function createDiagnosticSVG() {
 
 
 /* =========================================================
-   SCRATCH PROJECT JSON
+   SCRATCH PROJECT
 ========================================================= */
 
 function createProjectJSON() {
@@ -550,7 +632,7 @@ function createProjectJSON() {
 
 
 /* =========================================================
-   BUILD
+   BUILD SB3
 ========================================================= */
 
 async function buildSB3() {
@@ -558,16 +640,21 @@ async function buildSB3() {
         setStatus(
             "Please load a Genesis ROM first."
         );
+
         return;
     }
 
+    /*
+     * JSZip MUST exist.
+     */
     if (typeof JSZip === "undefined") {
         setStatus(
             "ERROR: JSZip is not loaded."
         );
 
         console.error(
-            "JSZip is undefined."
+            "JSZip is undefined. " +
+            "Make sure jszip.min.js is loaded before app.js."
         );
 
         return;
@@ -634,18 +721,17 @@ async function buildSB3() {
 
         setProgress(
             60,
-            "Creating visible diagnostic..."
+            "Creating diagnostic screen..."
         );
 
         var svg =
             createDiagnosticSVG();
 
         /*
-         * IMPORTANT:
+         * JSZip ONLY.
          *
-         * JSZip is the ONLY ZIP writer.
-         * We are NOT manually constructing
-         * ZIP headers or PK signatures.
+         * No manually-created ZIP headers.
+         * No manually-created PK signatures.
          */
 
         console.log(
@@ -695,9 +781,9 @@ async function buildSB3() {
                 }
             );
 
-        /* =================================================
-           ZIP VERIFICATION
-        ================================================= */
+        /*
+         * Verify the archive generated by JSZip.
+         */
 
         var bytes =
             new Uint8Array(
@@ -763,8 +849,7 @@ async function buildSB3() {
         if (resultText) {
             resultText.textContent =
                 "SB3 generated successfully. " +
-                "JSZip archive verified. " +
-                "Diagnostic screen included.";
+                "JSZip archive verified.";
         }
 
         show(result);
