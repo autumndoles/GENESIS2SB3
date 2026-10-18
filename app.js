@@ -1,4 +1,3 @@
-
 console.log("THE ONE PIECE IS REAL!!!-Whitebeard (Loaded)");
 console.log("Genesis2SB3 v0.9 — 68000 instruction decoder prototype");
 
@@ -510,11 +509,14 @@ function buildScratchProject(analysis, romBytes) {
         return blockId;
     }
 
+    /*
+     * FIX 1: Numeric comparisons use numeric shadows.
+     */
     function compare(opcode, left, right) {
         var blockId = addBlock(opcode);
 
-        setInput(blockId, "OPERAND1", left, "text");
-        setInput(blockId, "OPERAND2", right, "text");
+        setInput(blockId, "OPERAND1", left);
+        setInput(blockId, "OPERAND2", right);
 
         return blockId;
     }
@@ -527,12 +529,25 @@ function buildScratchProject(analysis, romBytes) {
         return compare("operator_gt", left, right);
     }
 
+    function less(left, right) {
+        return compare("operator_lt", left, right);
+    }
+
+    /*
+     * FIX 2: Scratch does not have operator_gte or operator_lte.
+     * NOT (A < B) means A >= B.
+     * NOT (A > B) means A <= B.
+     */
     function greaterEqual(left, right) {
-        return compare("operator_gte", left, right);
+        var blockId = addBlock("operator_not");
+        setInput(blockId, "OPERAND", less(left, right), "bool");
+        return blockId;
     }
 
     function lessEqual(left, right) {
-        return compare("operator_lte", left, right);
+        var blockId = addBlock("operator_not");
+        setInput(blockId, "OPERAND", greater(left, right), "bool");
+        return blockId;
     }
 
     function andCondition(left, right) {
@@ -797,17 +812,23 @@ function buildScratchProject(analysis, romBytes) {
 
     var isNOP = equals(opcodeReporter, 0x4E71);
 
-    var highOpcodeByte = floorReporter(
-        math(
-            "operator_divide",
-            variableReporter("Opcode"),
-            256
-        )
-    );
+    /*
+     * FIX 3: Make a fresh reporter tree for every input.
+     * Scratch blocks cannot be shared between multiple inputs.
+     */
+    function makeHighOpcodeByte() {
+        return floorReporter(
+            math(
+                "operator_divide",
+                variableReporter("Opcode"),
+                256
+            )
+        );
+    }
 
     var isMOVEQ = andCondition(
-        greaterEqual(highOpcodeByte, 0x70),
-        lessEqual(highOpcodeByte, 0x77)
+        greaterEqual(makeHighOpcodeByte(), 0x70),
+        lessEqual(makeHighOpcodeByte(), 0x77)
     );
 
     var branchLowByte = math(
@@ -818,7 +839,10 @@ function buildScratchProject(analysis, romBytes) {
 
     var branchLowIsZero = equals(branchLowByte, 0);
 
-    var branchHighMatches = equals(highOpcodeByte, 0x60);
+    var branchHighMatches = equals(
+        makeHighOpcodeByte(),
+        0x60
+    );
 
     /*
      * BRA with an 8-bit displacement of zero uses an
