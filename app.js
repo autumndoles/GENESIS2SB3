@@ -106,7 +106,7 @@ function analyzeGenesisROM(bytes) {
     );
 
     var a = {
-        filename: currentROM ? currentROM.name : "Unknown ROM",
+        filename: currentROM ? currentROM.name : "Unknown",
         fileSize: bytes.length,
         fileSizeFormatted: formatBytes(bytes.length),
         headerPresent: bytes.length >= 0x200,
@@ -177,9 +177,7 @@ function analyzeGenesisROM(bytes) {
     }
 
     if (a.checksumMatches === true) {
-        a.findings.push(
-            "Calculated checksum matches the stored checksum."
-        );
+        a.findings.push("Calculated checksum matches the stored checksum.");
     } else if (a.checksumMatches === false) {
         a.findings.push(
             "Checksum differs; the ROM may be modified or unusual."
@@ -223,15 +221,8 @@ function printAnalysis(a) {
         console.log(k + ":", a[k]);
     });
 
-    console.log(
-        "Initial 68000 SP:",
-        hex(a.initialStackPointer, 8)
-    );
-
-    console.log(
-        "68000 reset vector:",
-        hex(a.resetVector, 8)
-    );
+    console.log("Initial 68000 SP:", hex(a.initialStackPointer, 8));
+    console.log("68000 reset vector:", hex(a.resetVector, 8));
 
     console.log(
         "Stored checksum:",
@@ -283,7 +274,6 @@ function loadROM(file) {
     hide(progressContainer);
 
     setStatus("ROM loaded. Genesis2SB3 v0.8 is ready.");
-
     console.log("ROM ready for analysis:", file.name);
 }
 
@@ -309,11 +299,7 @@ if (dropZone) {
         e.preventDefault();
         dropZone.classList.remove("dragging");
 
-        if (
-            e.dataTransfer &&
-            e.dataTransfer.files &&
-            e.dataTransfer.files[0]
-        ) {
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
             loadROM(e.dataTransfer.files[0]);
         }
     });
@@ -351,10 +337,13 @@ if (removeRom) {
 }
 
 /* ---------------- Scratch block generator ----------------
-   The self-test program is:
-   MOVEQ #5,D0 ; MOVEQ #-3,D1 ; NOP ; BRA -2
+   Test instructions:
+   MOVEQ #5,D0
+   MOVEQ #-3,D1
+   NOP
+   BRA -2
 
-   The uploaded ROM is stored as a capped data list.
+   The uploaded ROM is stored separately as a capped data list.
 */
 
 function buildScratchProject(analysis, romBytes) {
@@ -407,14 +396,18 @@ function buildScratchProject(analysis, romBytes) {
         return [1, [10, String(s)]];
     }
 
+    /* FIX: reporter inputs use the correct Scratch input structure. */
     function setInput(parent, name, value, kind) {
         if (typeof value === "number") {
             blocks[parent].inputs[name] = [1, [4, String(value)]];
             return;
         }
 
-        if (value && typeof value === "object" &&
-            value.literalText !== undefined) {
+        if (
+            value &&
+            typeof value === "object" &&
+            value.literalText !== undefined
+        ) {
             blocks[parent].inputs[name] = [
                 1,
                 [10, String(value.literalText)]
@@ -422,14 +415,15 @@ function buildScratchProject(analysis, romBytes) {
             return;
         }
 
-        blocks[parent].inputs[name] =
-            kind === "bool"
-                ? [2, value]
-                : [
-                    3,
-                    value,
-                    kind === "text" ? [10, ""] : [4, "0"]
-                ];
+        if (kind === "bool") {
+            blocks[parent].inputs[name] = [2, value];
+        } else {
+            blocks[parent].inputs[name] = [
+                3,
+                [value, null],
+                kind === "text" ? [10, ""] : [4, "0"]
+            ];
+        }
 
         if (typeof value === "string" && blocks[value]) {
             blocks[value].parent = parent;
@@ -518,8 +512,10 @@ function buildScratchProject(analysis, romBytes) {
 
     function andCondition(a, b) {
         var r = add("operator_and");
+
         setInput(r, "OPERAND1", a, "bool");
         setInput(r, "OPERAND2", b, "bool");
+
         return r;
     }
 
@@ -599,7 +595,7 @@ function buildScratchProject(analysis, romBytes) {
         return compare("operator_lte", a, b);
     }
 
-    /* Fetch the next 16-bit opcode from the test list. */
+    /* Read two bytes from the CPU test program. */
     var fetchHighIndex = math(
         "operator_add",
         variable("PC"),
@@ -638,7 +634,7 @@ function buildScratchProject(analysis, romBytes) {
 
     var setOpcode = setVar("Opcode", opcodeExpression);
 
-    /* NOP: advance PC by two bytes. */
+    /* NOP: PC += 2. */
     var nopNextPC = math(
         "operator_add",
         variable("PC"),
@@ -647,7 +643,7 @@ function buildScratchProject(analysis, romBytes) {
 
     var nop = setVar("PC", nopNextPC);
 
-    /* MOVEQ: decode the register and signed immediate. */
+    /* MOVEQ: extract the destination register. */
     var opMinusBase = math(
         "operator_subtract",
         variable("Opcode"),
@@ -660,17 +656,14 @@ function buildScratchProject(analysis, romBytes) {
         512
     );
 
+    /* FIX: create floor reporter first, then connect its input. */
     var floorReg = add(
         "operator_mathop",
-        {
-            NUM: [
-                3,
-                dividedReg,
-                [4, "0"]
-            ]
-        },
+        {},
         { OPERATOR: ["floor", null] }
     );
+
+    setInput(floorReg, "NUM", dividedReg);
 
     var setReg = setVar("Register", floorReg);
 
@@ -742,7 +735,7 @@ function buildScratchProject(analysis, romBytes) {
         moveqNextPC
     ];
 
-    /* BRA with a signed 8-bit displacement. */
+    /* BRA: signed 8-bit branch displacement. */
     var braSetImmediate = setVar(
         "Immediate",
         math(
@@ -777,6 +770,7 @@ function buildScratchProject(analysis, romBytes) {
     );
 
     var braSetPC = setVar("PC", braTarget);
+
     var braChain = [
         braSetImmediate,
         braSign,
@@ -788,6 +782,7 @@ function buildScratchProject(analysis, romBytes) {
     });
 
     var haltSetHalted = setVar("Halted", 1);
+
     var haltChain = [
         haltSetResult,
         haltSetHalted
@@ -805,20 +800,21 @@ function buildScratchProject(analysis, romBytes) {
         moveqHigh
     );
 
+    /* FIX: create floor reporter first, then connect its input. */
     var highByte = add(
         "operator_mathop",
-        {
-            NUM: [
-                3,
-                math(
-                    "operator_divide",
-                    variable("Opcode"),
-                    256
-                ),
-                [4, "0"]
-            ]
-        },
+        {},
         { OPERATOR: ["floor", null] }
+    );
+
+    setInput(
+        highByte,
+        "NUM",
+        math(
+            "operator_divide",
+            variable("Opcode"),
+            256
+        )
     );
 
     var isBRAHigh = equals(highByte, 0x60);
@@ -865,7 +861,7 @@ function buildScratchProject(analysis, romBytes) {
         dispatchNOP
     ]);
 
-    /* Execute with a bounded loop for safety. */
+    /* Bounded execution loop. */
     var haltedCheck = equals(
         variable("Halted"),
         0
@@ -896,10 +892,7 @@ function buildScratchProject(analysis, romBytes) {
     var checkD0 = equals(variable("D0"), 5);
     var checkD1 = equals(variable("D1"), -3);
 
-    var bothPass = andCondition(
-        checkD0,
-        checkD1
-    );
+    var bothPass = andCondition(checkD0, checkD1);
 
     var setPass = setVar("Result", {
         literalText:
@@ -931,7 +924,6 @@ function buildScratchProject(analysis, romBytes) {
     var setPC0 = setVar("PC", 0);
     var setHalted0 = setVar("Halted", 0);
     var setSteps0 = setVar("Steps", 0);
-
     var setResultStart = setVar("Result", {
         literalText: "CPU self-test running..."
     });
@@ -959,10 +951,11 @@ function buildScratchProject(analysis, romBytes) {
     ];
 
     chain(script, hat);
+
     blocks[hat].next = script[0];
     blocks[script[0]].parent = hat;
 
-    /* Scratch variable values use [name, value]. */
+    /* Scratch variable values. */
     var variables = {};
 
     Object.keys(variableIds).forEach(function (name) {
@@ -1060,9 +1053,7 @@ function buildScratchProject(analysis, romBytes) {
 /* ---------------- Diagnostic stage artwork ---------------- */
 
 function createDiagnosticSVG(a) {
-    var title = a
-        ? shorten(a.title, 34)
-        : "Unknown";
+    var title = a ? shorten(a.title, 34) : "Unknown";
 
     var checksum =
         !a || a.checksumMatches === null
@@ -1113,9 +1104,7 @@ async function buildSB3() {
 
     if (typeof JSZip === "undefined") {
         setStatus("ERROR: JSZip is not loaded.");
-        console.error(
-            "JSZip is undefined. Load jszip.min.js before app.js."
-        );
+        console.error("JSZip is undefined. Load jszip.min.js before app.js.");
         return;
     }
 
@@ -1156,11 +1145,7 @@ async function buildSB3() {
         var zip = new JSZip();
 
         zip.file("project.json", projectText);
-
-        zip.file(
-            "ff3f2e0196df3c7d286c4c13e441b003.svg",
-            svg
-        );
+        zip.file("ff3f2e0196df3c7d286c4c13e441b003.svg", svg);
 
         var blob = await zip.generateAsync({
             type: "blob",
@@ -1173,17 +1158,10 @@ async function buildSB3() {
             );
         });
 
-        var archiveBytes = new Uint8Array(
-            await blob.arrayBuffer()
-        );
+        var archiveBytes = new Uint8Array(await blob.arrayBuffer());
 
-        if (
-            archiveBytes[0] !== 80 ||
-            archiveBytes[1] !== 75
-        ) {
-            throw new Error(
-                "JSZip did not produce a valid ZIP archive."
-            );
+        if (archiveBytes[0] !== 80 || archiveBytes[1] !== 75) {
+            throw new Error("JSZip did not produce a valid ZIP archive.");
         }
 
         console.log(
@@ -1211,10 +1189,7 @@ async function buildSB3() {
             };
         }
 
-        setProgress(
-            100,
-            "Scratch CPU self-test project generated."
-        );
+        setProgress(100, "Scratch CPU self-test project generated.");
 
         if (resultText) {
             resultText.textContent =
@@ -1227,9 +1202,7 @@ async function buildSB3() {
 
         show(result);
 
-        setStatus(
-            "v0.8 SB3 generated. Scratch CPU self-test is ready."
-        );
+        setStatus("v0.8 SB3 generated. Scratch CPU self-test is ready.");
 
         console.log(
             "Genesis2SB3 v0.8 generated. Embedded ROM prefix:",
