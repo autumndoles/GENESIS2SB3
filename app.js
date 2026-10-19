@@ -1,24 +1,19 @@
 console.log("THE ONE PIECE IS REAL!!!-Whitebeard (Loaded)");
-console.log("Genesis2SB3 v0.9 — 68000 instruction decoder prototype");
+console.log("Genesis2SB3 v1.0 — 68000 instruction decoder prototype");
 
 /*
- * Genesis2SB3 v0.9
- * Builds a Scratch project that fetches and decodes a limited subset
- * of Motorola 68000 instructions from the uploaded Genesis ROM.
+ * Genesis2SB3 v1.0
  *
  * Supported instructions:
  *   NOP
  *   MOVEQ #imm,Dn
  *   BRA short-displacement
  *
- * Important limitations:
- * - Only the first 64 KiB of ROM data is embedded.
- * - Only a small subset of 68000 instructions is supported.
- * - Genesis memory mapping, VDP graphics, sound, interrupts, and
- *   controller input are not implemented.
- * - This is not yet a playable Genesis emulator.
+ * This is an experimental CPU prototype, not a complete Genesis
+ * emulator. Only the first 64 KiB of ROM is embedded. Memory mapping,
+ * graphics, sound, interrupts, and controller input are not implemented.
  *
- * JSZip is required for .sb3 generation.
+ * JSZip must load before this file.
  */
 
 var romInput = document.getElementById("romInput");
@@ -65,7 +60,9 @@ function setStatus(message) {
 
 function setProgress(percent, message) {
     if (progressBar) progressBar.style.width = percent + "%";
-    if (progressPercent) progressPercent.textContent = Math.round(percent) + "%";
+    if (progressPercent) {
+        progressPercent.textContent = Math.round(percent) + "%";
+    }
     if (progressText) progressText.textContent = message;
 }
 
@@ -86,7 +83,10 @@ function shorten(value, maxLength) {
 }
 
 function hex(value, digits) {
-    if (value == null || !Number.isFinite(value)) return "Unavailable";
+    if (value == null || !Number.isFinite(value)) {
+        return "Unavailable";
+    }
+
     return "0x" + value.toString(16).toUpperCase()
         .padStart(digits || 4, "0");
 }
@@ -153,7 +153,6 @@ function analyzeGenesisROM(bytes) {
     };
 
     analysis.consoleLooksLikeGenesis = /SEGA/i.test(analysis.consoleName);
-
     analysis.calculatedChecksum = null;
     analysis.checksumMatches = null;
 
@@ -234,7 +233,7 @@ function analyzeGenesisROM(bytes) {
 }
 
 function printAnalysis(a) {
-    console.group("Genesis2SB3 v0.9 — ROM Analysis");
+    console.group("Genesis2SB3 v1.0 — ROM Analysis");
 
     [
         "filename",
@@ -251,6 +250,7 @@ function printAnalysis(a) {
 
     console.log("Initial stack pointer:", hex(a.initialStackPointer, 8));
     console.log("Reset vector:", hex(a.resetVector, 8));
+
     console.log(
         "Stored checksum:",
         hex(a.storedChecksum, 4),
@@ -259,8 +259,8 @@ function printAnalysis(a) {
         "Match:",
         a.checksumMatches
     );
-    console.log("Findings:", a.findings);
 
+    console.log("Findings:", a.findings);
     console.groupEnd();
 }
 
@@ -278,7 +278,7 @@ function loadROM(file) {
     if (romSize) romSize.textContent = formatBytes(file.size);
 
     if (romStatus) {
-        romStatus.textContent = "ROM loaded. Ready for v0.9 analysis.";
+        romStatus.textContent = "ROM loaded. Ready for v1.0 analysis.";
     }
 
     show(romInfo);
@@ -294,7 +294,7 @@ function loadROM(file) {
     hide(result);
     hide(progressContainer);
 
-    setStatus("ROM loaded. Genesis2SB3 v0.9 is ready.");
+    setStatus("ROM loaded. Genesis2SB3 v1.0 is ready.");
     console.log("ROM ready:", file.name, formatBytes(file.size));
 }
 
@@ -371,6 +371,7 @@ function buildScratchProject(analysis, romBytes) {
     var variableNames = [
         "PC", "Opcode", "Immediate", "Register",
         "Steps", "Halted", "Result",
+        "Instruction PC", "Fault PC", "Fault Opcode", "Supported",
         "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7",
         "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7"
     ];
@@ -509,9 +510,6 @@ function buildScratchProject(analysis, romBytes) {
         return blockId;
     }
 
-    /*
-     * FIX 1: Numeric comparisons use numeric shadows.
-     */
     function compare(opcode, left, right) {
         var blockId = addBlock(opcode);
 
@@ -533,11 +531,7 @@ function buildScratchProject(analysis, romBytes) {
         return compare("operator_lt", left, right);
     }
 
-    /*
-     * FIX 2: Scratch does not have operator_gte or operator_lte.
-     * NOT (A < B) means A >= B.
-     * NOT (A > B) means A <= B.
-     */
+    // Scratch does not have native >= or <= reporters.
     function greaterEqual(left, right) {
         var blockId = addBlock("operator_not");
         setInput(blockId, "OPERAND", less(left, right), "bool");
@@ -629,11 +623,7 @@ function buildScratchProject(analysis, romBytes) {
         );
     }
 
-    /* -----------------------------------------------------
-       FETCH
-       PC is a zero-based ROM byte offset.
-       Scratch lists use one-based indexes, hence PC + 1.
-       ----------------------------------------------------- */
+    /* Fetch the instruction using the PC as a zero-based byte offset. */
 
     var highIndex = math(
         "operator_add",
@@ -665,15 +655,14 @@ function buildScratchProject(analysis, romBytes) {
 
     var fetchOpcode = setVariable("Opcode", opcodeValue);
 
-    /* -----------------------------------------------------
-       NOP: 0x4E71
-       ----------------------------------------------------- */
+    /* NOP: 0x4E71 */
 
-    var nop = setPCPlusTwo();
+    var nopBody = [
+        setVariable("Supported", 1),
+        setPCPlusTwo()
+    ];
 
-    /* -----------------------------------------------------
-       MOVEQ #signed-byte,Dn
-       ----------------------------------------------------- */
+    /* MOVEQ #signed-byte,Dn */
 
     var opcodeMinusBase = math(
         "operator_subtract",
@@ -709,10 +698,6 @@ function buildScratchProject(analysis, romBytes) {
         ]
     );
 
-    /*
-     * Generate a conditional assignment for D0 through D7.
-     * Only the selected data register is changed.
-     */
     var registerDispatch = [];
 
     for (var r = registers.length - 1; r >= 0; r--) {
@@ -738,6 +723,7 @@ function buildScratchProject(analysis, romBytes) {
     }
 
     var moveqBody = [
+        setVariable("Supported", 1),
         setRegisterNumber,
         setImmediate,
         signExtendImmediate
@@ -745,10 +731,7 @@ function buildScratchProject(analysis, romBytes) {
 
     moveqBody.push(setPCPlusTwo());
 
-    /* -----------------------------------------------------
-       BRA short displacement
-       Target = old PC + 2 + signed displacement
-       ----------------------------------------------------- */
+    /* BRA short displacement */
 
     var branchSetImmediate = setVariable(
         "Immediate",
@@ -787,35 +770,29 @@ function buildScratchProject(analysis, romBytes) {
     );
 
     var branchBody = [
+        setVariable("Supported", 1),
         branchSetImmediate,
         branchSignExtend,
         branchSetPC
     ];
 
-    /* -----------------------------------------------------
-       Unsupported instructions stop execution.
-       ----------------------------------------------------- */
+    /* Unsupported instructions should halt with diagnostics. */
 
     var unsupportedBody = [
+        setVariable("Fault PC", variableReporter("Instruction PC")),
+        setVariable("Fault Opcode", variableReporter("Opcode")),
         setVariable("Result", {
             literalText:
-                "STOPPED: unsupported opcode. Inspect the Opcode monitor."
+                "STOPPED: unsupported opcode. Check Fault PC and Fault Opcode."
         }),
         setVariable("Halted", 1)
     ];
 
-    /* -----------------------------------------------------
-       Decode the opcode.
-       ----------------------------------------------------- */
+    /* Opcode decoder */
 
     var opcodeReporter = variableReporter("Opcode");
-
     var isNOP = equals(opcodeReporter, 0x4E71);
 
-    /*
-     * FIX 3: Make a fresh reporter tree for every input.
-     * Scratch blocks cannot be shared between multiple inputs.
-     */
     function makeHighOpcodeByte() {
         return floorReporter(
             math(
@@ -838,16 +815,9 @@ function buildScratchProject(analysis, romBytes) {
     );
 
     var branchLowIsZero = equals(branchLowByte, 0);
+    var branchHighMatches = equals(makeHighOpcodeByte(), 0x60);
 
-    var branchHighMatches = equals(
-        makeHighOpcodeByte(),
-        0x60
-    );
-
-    /*
-     * BRA with an 8-bit displacement of zero uses an
-     * extension word, which this version does not support.
-     */
+    // A zero short displacement uses an extension word, not supported here.
     var isShortBRA = andCondition(
         branchHighMatches,
         equals(branchLowIsZero, 0)
@@ -867,17 +837,16 @@ function buildScratchProject(analysis, romBytes) {
 
     var opcodeDispatch = ifElse(
         isNOP,
-        [nop],
+        nopBody,
         [moveqDispatch]
     );
 
-    var executeInstruction = chain(
-        [fetchOpcode, opcodeDispatch]
-    );
+    var executeInstruction = chain([
+        fetchOpcode,
+        opcodeDispatch
+    ]);
 
-    /* -----------------------------------------------------
-       Check ROM bounds before attempting a fetch.
-       ----------------------------------------------------- */
+    /* Validate ROM bounds before fetching. */
 
     var pcAtLeastZero = greaterEqual(
         variableReporter("PC"),
@@ -899,6 +868,7 @@ function buildScratchProject(analysis, romBytes) {
     );
 
     var outOfRangeBody = [
+        setVariable("Fault PC", variableReporter("PC")),
         setVariable("Result", {
             literalText:
                 "STOPPED: PC reached outside the embedded ROM range."
@@ -909,8 +879,53 @@ function buildScratchProject(analysis, romBytes) {
     var executeIfValid = ifElse(
         pcValid,
         [
+            setVariable("Instruction PC", variableReporter("PC")),
+            setVariable("Supported", 0),
             changeVariable("Steps", 1),
-            executeInstruction
+            executeInstruction,
+
+            // Fallback guard: if decoding failed to mark an instruction
+            // supported, stop and record the exact fault location.
+            ifOnly(
+                andCondition(
+                    equals(variableReporter("Supported"), 0),
+                    equals(variableReporter("Halted"), 0)
+                ),
+                [
+                    setVariable(
+                        "Fault PC",
+                        variableReporter("Instruction PC")
+                    ),
+                    setVariable(
+                        "Fault Opcode",
+                        variableReporter("Opcode")
+                    ),
+                    setVariable("Result", {
+                        literalText:
+                            "STOPPED: unsupported opcode. Check Fault PC and Fault Opcode."
+                    }),
+                    setVariable("Halted", 1)
+                ]
+            ),
+
+            // Set the safety-limit message inside the loop so the message
+            // does not depend solely on blocks after the repeat block.
+            ifOnly(
+                andCondition(
+                    greaterEqual(
+                        variableReporter("Steps"),
+                        CPU_STEP_LIMIT
+                    ),
+                    equals(variableReporter("Halted"), 0)
+                ),
+                [
+                    setVariable("Result", {
+                        literalText:
+                            "Stopped at the instruction safety limit."
+                    }),
+                    setVariable("Halted", 1)
+                ]
+            )
         ],
         outOfRangeBody
     );
@@ -932,9 +947,7 @@ function buildScratchProject(analysis, romBytes) {
     var repeatBody = chain([executionGuard], repeat);
     blocks[repeat].inputs.SUBSTACK = [2, repeatBody];
 
-    /* -----------------------------------------------------
-       Initialize the CPU.
-       ----------------------------------------------------- */
+    /* Initialize the CPU. */
 
     var initialPC =
         analysis.resetVector !== null
@@ -953,6 +966,10 @@ function buildScratchProject(analysis, romBytes) {
         setVariable("Register", 0),
         setVariable("Steps", 0),
         setVariable("Halted", 0),
+        setVariable("Instruction PC", initialPC),
+        setVariable("Fault PC", 0),
+        setVariable("Fault Opcode", 0),
+        setVariable("Supported", 0),
         setVariable("Result", {
             literalText: "CPU running..."
         })
@@ -962,10 +979,7 @@ function buildScratchProject(analysis, romBytes) {
         initialization.push(setVariable(name, 0));
     });
 
-    /*
-     * The 68000's A7 is its stack pointer.
-     * A0-A6 begin at zero in this prototype.
-     */
+    // A7 is the 68000 stack pointer. A0-A6 begin at zero in this prototype.
     for (var a = 0; a < 7; a++) {
         initialization.push(setVariable("A" + a, 0));
     }
@@ -973,13 +987,9 @@ function buildScratchProject(analysis, romBytes) {
     initialization.push(setVariable("A7", initialSP));
     initialization.push(repeat);
 
-    /*
-     * If the interpreter did not stop on an unsupported
-     * instruction or out-of-range PC, report the safety limit.
-     */
     var setLimitResult = setVariable("Result", {
         literalText:
-            "Stopped at the 100-instruction safety limit."
+            "Stopped at the instruction safety limit."
     });
 
     var stillRunning = equals(
@@ -1019,9 +1029,7 @@ function buildScratchProject(analysis, romBytes) {
     blocks[hat].next = script[0];
     blocks[script[0]].parent = hat;
 
-    /* -----------------------------------------------------
-       Project data
-       ----------------------------------------------------- */
+    /* Scratch project data */
 
     var variables = {};
 
@@ -1051,7 +1059,8 @@ function buildScratchProject(analysis, romBytes) {
         "PC", "Opcode", "Immediate", "Register",
         "D0", "D1", "D2", "D3",
         "D4", "D5", "D6", "D7",
-        "A7", "Steps", "Halted", "Result"
+        "A7", "Steps", "Halted", "Instruction PC",
+        "Fault PC", "Fault Opcode", "Supported", "Result"
     ].forEach(function (name, index) {
         var isResult = name === "Result";
 
@@ -1090,7 +1099,7 @@ function buildScratchProject(analysis, romBytes) {
 
             costumes: [{
                 assetId: "ff3f2e0196df3c7d286c4c13e441b003",
-                name: "Genesis2SB3 v0.9 CPU",
+                name: "Genesis2SB3 v1.0 CPU",
                 bitmapResolution: 1,
                 md5ext: "ff3f2e0196df3c7d286c4c13e441b003.svg",
                 dataFormat: "svg",
@@ -1113,7 +1122,7 @@ function buildScratchProject(analysis, romBytes) {
         meta: {
             semver: "3.0.0",
             vm: "11.3.0",
-            agent: "Genesis2SB3 v0.9 68000 Subset Prototype"
+            agent: "Genesis2SB3 v1.0 68000 Subset Prototype"
         },
 
         _diagnosticSVG: svg
@@ -1141,7 +1150,7 @@ function createDiagnosticSVG(analysis, embeddedBytes) {
         '<rect width="480" height="360" fill="#202020"/>' +
         '<rect x="10" y="10" width="460" height="340" fill="#101010" stroke="#fff" stroke-width="2"/>' +
 
-        text(240, 36, "GENESIS2SB3 v0.9", "#ffffff", 24, "middle") +
+        text(240, 36, "GENESIS2SB3 v1.0", "#ffffff", 24, "middle") +
         text(240, 56, "68000 INSTRUCTION PROTOTYPE", "#aaaaaa", 11, "middle") +
 
         text(24, 88, "ROM TITLE", "#ffffff", 12) +
@@ -1181,11 +1190,9 @@ async function buildSB3() {
 
     if (typeof JSZip === "undefined") {
         setStatus("ERROR: JSZip is not loaded.");
-
         console.error(
             "JSZip is undefined. Load jszip.min.js before app.js."
         );
-
         return;
     }
 
@@ -1266,10 +1273,7 @@ async function buildSB3() {
             await blob.arrayBuffer()
         );
 
-        if (
-            archiveBytes[0] !== 80 ||
-            archiveBytes[1] !== 75
-        ) {
+        if (archiveBytes[0] !== 80 || archiveBytes[1] !== 75) {
             throw new Error(
                 "JSZip did not produce a valid ZIP archive."
             );
@@ -1291,9 +1295,8 @@ async function buildSB3() {
                 if (!currentDownloadURL) return;
 
                 var link = document.createElement("a");
-
                 link.href = currentDownloadURL;
-                link.download = "Genesis2SB3-v0.9-CPU-prototype.sb3";
+                link.download = "Genesis2SB3-v1.0-CPU-diagnostics.sb3";
 
                 document.body.appendChild(link);
                 link.click();
@@ -1305,11 +1308,11 @@ async function buildSB3() {
 
         if (resultText) {
             resultText.textContent =
-                "Genesis2SB3 v0.9 generated successfully. " +
+                "Genesis2SB3 v1.0 generated successfully. " +
                 "Import the SB3 into Scratch and click the green flag. " +
-                "The project fetches instructions from the embedded ROM " +
-                "and attempts NOP, MOVEQ, and short BRA. Unsupported " +
-                "instructions stop execution. The project embeds " +
+                "The project attempts NOP, MOVEQ, and short BRA. " +
+                "Unsupported instructions should stop with Fault PC and " +
+                "Fault Opcode diagnostics. The project embeds " +
                 embeddedSize +
                 " bytes of ROM data. It is not yet a playable emulator.";
         }
@@ -1317,11 +1320,11 @@ async function buildSB3() {
         show(result);
 
         setStatus(
-            "v0.9 SB3 generated. Import it into Scratch to test the CPU."
+            "v1.0 SB3 generated. Import it into Scratch to test CPU diagnostics."
         );
 
         console.log(
-            "Genesis2SB3 v0.9 generated.",
+            "Genesis2SB3 v1.0 generated.",
             "Reset vector:",
             hex(currentAnalysis.resetVector, 8),
             "Embedded ROM bytes:",
